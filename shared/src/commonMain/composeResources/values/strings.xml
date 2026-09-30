@@ -1,0 +1,85 @@
+<resources>
+    <string name="brand_name">BiletFlow</string>
+
+    <string name="auth_login_title">Login</string>
+    <string name="auth_login_subtitle">Tickets and orders are linked to your email.</string>
+    <string name="auth_registration_title">Registration</string>
+    <string name="auth_registration_subtitle">After registration, confirm your email — otherwise tickets will not arrive.</string>
+
+    <string name="auth_email_label">Email</string>
+    <string name="auth_password_label">Password</string>
+    <string name="auth_name_label">Full name</string>
+    <string name="auth_email_placeholder">name@example.kz</string>
+    <string name="auth_password_placeholder">••••••••</string>
+    <string name="auth_name_placeholder">Will be shown on the ticket</string>
+    <string name="auth_password_registration_placeholder">Minimum 8 characters</string>
+    <string name="auth_confirm_password_label">Confirm password</string>
+    <string name="auth_confirm_password_placeholder">Repeat your password</string>
+
+    <string name="auth_forgot_password">Forgot password?</string>
+    <string name="auth_login_button">Log in</string>
+    <string name="auth_registration_button">Create account</string>
+    <string name="auth_no_account">No account? Register</string>
+    <string name="auth_have_account">Already have an account? Log in</string>
+    <string name="auth_email_confirmation_hint">A confirmation email will be sent here</string>
+    <string name="auth_short_password_error">Password is too short</string>
+    <string name="auth_terms">By registering, you agree to the platform terms</string>
+    <string name="auth_request_failed">Something went wrong. Please try again.</string>
+    <string name="auth_request_success">Request completed successfully.</string>
+    <string name="auth_error_email_required">Enter your email.</string>
+    <string name="auth_error_email_invalid">Enter a valid email.</string>
+    <string name="auth_error_password_required">Enter your password.</string>
+    <string name="auth_error_password_short">Password must contain at least 8 characters.</string>
+    <string name="auth_error_password_mismatch">Passwords do not match.</string>
+
+    <string name="language_ru">RU</string>
+    <string name="events_search_placeholder">Search events in Astana</string>
+    <string name="events_filter_all">All</string>
+    <string name="events_filter_concerts">Concerts</string>
+    <string name="events_filter_lectures">Lectures</string>
+    <string name="events_filter_sport">Sport</string>
+    <string name="event_cover_placeholder">[Cover]</string>
+    <string name="event_a_category">Concert</string>
+    <string name="event_a_title">[Event A]</string>
+    <string name="event_a_date">Sat, October 24 · 19:00 (UTC+5)</string>
+    <string name="event_a_venue">[Venue], Astana</string>
+    <string name="event_a_price">from 5,000 ₸</string>
+    <string name="event_b_category">Lecture</string>
+    <string name="event_b_tag">Registration</string>
+    <string name="event_b_title">[Event B]</string>
+    <string name="event_b_date">Sat, November 7 · 18:30 (UTC+5)</string>
+    <string name="event_b_price">Free</string>
+    <string name="event_c_category">Sport</string>
+    <string name="event_c_tag">Few seats left</string>
+    <string name="event_c_title">[Event C]</string>
+    <string name="event_c_date">Sun, November 15 · 14:00 (UTC+5)</string>
+    <string name="event_c_price">from 2,500 ₸</string>
+    <string name="event_more">More</string>
+
+    <string name="event_details_cover_placeholder">[Event cover]</string>
+    <string name="event_details_category">Concert</string>
+    <string name="event_details_title">[Event name]</string>
+    <string name="event_details_date">Sat, October 24 · 19:00–22:00</string>
+    <string name="event_details_timezone">Astana time (UTC+5)</string>
+    <string name="event_details_venue">[Venue]</string>
+    <string name="event_details_address">[Address], Astana</string>
+    <string name="event_add_to_calendar">+ Add to calendar</string>
+    <string name="event_promo">STUDENT20 applied · 20% off Standard</string>
+    <string name="event_tickets">Tickets</string>
+    <string name="ticket_standard">Standard</string>
+    <string name="ticket_standard_price">4,000 ₸</string>
+    <string name="ticket_standard_old_price">5,000 ₸</string>
+    <string name="ticket_standard_left">48 left</string>
+    <string name="ticket_vip">VIP</string>
+    <string name="ticket_vip_price">15,000 ₸</string>
+    <string name="ticket_vip_left">3 left</string>
+    <string name="ticket_free">Entrance (free)</string>
+    <string name="ticket_registration_closed">Registration closed</string>
+    <string name="ticket_unavailable">Unavailable</string>
+    <string name="event_about">About the event</string>
+    <string name="event_description">[Event description from the organizer]</string>
+    <string name="event_support">Question about the event? Contact support</string>
+    <string name="event_selected_tickets">2 tickets</string>
+    <string name="event_total">8,000 ₸</string>
+    <string name="event_checkout">Checkout</string>
+</resources>
