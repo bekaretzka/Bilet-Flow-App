@@ -38,7 +38,14 @@
     <string name="events_filter_concerts">Concerts</string>
     <string name="events_filter_lectures">Lectures</string>
     <string name="events_filter_sport">Sport</string>
+    <string name="events_loading">Loading events…</string>
+    <string name="events_empty_catalog">There are no events yet.</string>
+    <string name="events_no_matches">No events match your search and filters.</string>
+    <string name="events_load_error">Couldn't load events. Check your connection.</string>
+    <string name="events_retry">Retry</string>
     <string name="event_cover_placeholder">[Cover]</string>
+    <string name="event_category_unavailable">Other</string>
+    <string name="event_venue_unavailable">Venue to be announced</string>
     <string name="event_a_category">Concert</string>
     <string name="event_a_title">[Event A]</string>
     <string name="event_a_date">Sat, October 24 · 19:00 (UTC+5)</string>

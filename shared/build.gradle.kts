@@ -11,7 +11,7 @@ plugins {
 kotlin {
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "Shared"
@@ -61,11 +61,13 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.contentNegotiation)
+            implementation(libs.ktor.client.mock)
             implementation(libs.ktor.serialization.kotlinxJson)
             implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

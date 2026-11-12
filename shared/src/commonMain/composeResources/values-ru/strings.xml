@@ -38,7 +38,14 @@
     <string name="events_filter_concerts">Концерты</string>
     <string name="events_filter_lectures">Лекции</string>
     <string name="events_filter_sport">Спорт</string>
+    <string name="events_loading">Загружаем события…</string>
+    <string name="events_empty_catalog">Событий пока нет.</string>
+    <string name="events_no_matches">По вашему запросу и фильтрам ничего не найдено.</string>
+    <string name="events_load_error">Не удалось загрузить события. Проверьте подключение.</string>
+    <string name="events_retry">Повторить</string>
     <string name="event_cover_placeholder">[Обложка]</string>
+    <string name="event_category_unavailable">Другое</string>
+    <string name="event_venue_unavailable">Площадка уточняется</string>
     <string name="event_a_category">Концерт</string>
     <string name="event_a_title">[Событие А]</string>
     <string name="event_a_date">Сб, 24 октября · 19:00 (UTC+5)</string>
