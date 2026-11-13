@@ -24,6 +24,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.stringResource
 import biletflow.shared.generated.resources.*
 import com.example.biletflow.domain.repositories.AuthRepository
+import com.example.biletflow.domain.models.AuthTokens
+import com.example.biletflow.domain.session.SessionStore
 
 private val PageBackground = Color(0xFFF7F4EC)
 private val Ink = Color(0xFF17171B)
@@ -49,11 +52,28 @@ private val FieldBorder = Color(0xFFD9D5CC)
 enum class AuthPage { Login, Registration }
 
 @Composable
-fun LoginPage(viewModel: AuthViewModel, onOpenRegistration: () -> Unit) {
+fun LoginPage(
+    viewModel: AuthViewModel,
+    onClose: () -> Unit,
+    onLoginSuccess: () -> Unit,
+    onOpenRegistration: (() -> Unit)? = null,
+) {
     val state by viewModel.state.collectAsState()
     val form by viewModel.form.collectAsState()
+    LaunchedEffect(state.isSuccess) {
+        if (state.isSuccess) onLoginSuccess()
+    }
 
     AuthLayout {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            TextButton(
+                onClick = onClose,
+                enabled = !state.isLoading,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) {
+                Text(stringResource(Res.string.auth_close), color = Purple, fontWeight = FontWeight.SemiBold)
+            }
+        }
         Brand()
         PageTitle(
             title = stringResource(Res.string.auth_login_title),
@@ -74,9 +94,11 @@ fun LoginPage(viewModel: AuthViewModel, onOpenRegistration: () -> Unit) {
             enabled = !state.isLoading,
             onClick = viewModel::login,
         )
-        Spacer(Modifier.height(14.dp))
-        TextButton(onClick = onOpenRegistration, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(Res.string.auth_no_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        onOpenRegistration?.let { openRegistration ->
+            Spacer(Modifier.height(14.dp))
+            TextButton(onClick = openRegistration, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(Res.string.auth_no_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -224,9 +246,12 @@ private fun AuthFeedback(state: AuthUiState) {
             AuthValidationError.PasswordMismatch -> stringResource(Res.string.auth_error_password_mismatch)
         }
     }
-    state.errorMessage?.let { message ->
+    state.requestError?.let { error ->
         Text(
-            text = message.ifBlank { stringResource(Res.string.auth_request_failed) },
+            text = when (error) {
+                AuthRequestError.InvalidCredentials -> stringResource(Res.string.auth_error_invalid_credentials)
+                AuthRequestError.Network -> stringResource(Res.string.auth_error_network)
+            },
             color = Error,
             fontSize = 11.sp,
             lineHeight = 15.sp,
@@ -253,18 +278,29 @@ private fun AuthFeedback(state: AuthUiState) {
 }
 
 private class PreviewAuthRepository : AuthRepository {
-    override suspend fun login(email: String, password: String) = Unit
+    override suspend fun login(email: String, password: String) = AuthTokens("access", "refresh", "bearer")
     override suspend fun register(email: String, password: String) = Unit
 }
 
 @Composable
 @Preview(showBackground = true)
 private fun LoginPreview() {
-    MaterialTheme { LoginPage(viewModel = AuthViewModel(PreviewAuthRepository()), onOpenRegistration = {}) }
+    MaterialTheme {
+        LoginPage(
+            viewModel = AuthViewModel(PreviewAuthRepository(), SessionStore()),
+            onClose = {},
+            onLoginSuccess = {},
+        )
+    }
 }
 
 @Composable
 @Preview(showBackground = true)
 private fun RegistrationPreview() {
-    MaterialTheme { RegistrationPage(viewModel = AuthViewModel(PreviewAuthRepository()), onOpenLogin = {}) }
+    MaterialTheme {
+        RegistrationPage(
+            viewModel = AuthViewModel(PreviewAuthRepository(), SessionStore()),
+            onOpenLogin = {},
+        )
+    }
 }

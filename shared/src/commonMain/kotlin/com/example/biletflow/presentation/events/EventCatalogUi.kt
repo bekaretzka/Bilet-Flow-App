@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import biletflow.shared.generated.resources.*
 import com.example.biletflow.domain.models.Event
+import com.example.biletflow.domain.models.TicketType
 import com.example.biletflow.domain.repositories.EventsRepository
 import org.jetbrains.compose.resources.stringResource
 
@@ -48,7 +49,7 @@ private val FieldBorder = Color(0xFFD9D5CC)
 private val Cover = Color(0xFFDDD7C7)
 
 @Composable
-fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: () -> Unit) {
+fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: (Int) -> Unit) {
     val state by viewModel.state.collectAsState()
     val visibleEvents = filterEvents(state.events, state.query, state.category)
     val filters = listOf(
@@ -94,7 +95,7 @@ fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: () -> Unit) {
             state.events.isEmpty() -> CatalogMessage(stringResource(Res.string.events_empty_catalog))
             visibleEvents.isEmpty() -> CatalogMessage(stringResource(Res.string.events_no_matches))
             else -> visibleEvents.forEach { event ->
-                EventCard(event = event, onClick = onOpenEvent)
+                EventCard(event = event, onClick = { onOpenEvent(event.id) })
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -231,6 +232,10 @@ private val previewEvent = Event(
 @Composable
 @Preview(showBackground = true)
 private fun EventCatalogPreview() {
-    val repository = object : EventsRepository { override suspend fun getEvents() = listOf(previewEvent) }
+    val repository = object : EventsRepository {
+        override suspend fun getEvents() = listOf(previewEvent)
+        override suspend fun getEvent(eventId: Int) = previewEvent
+        override suspend fun getTicketTypes(eventId: Int) = emptyList<TicketType>()
+    }
     MaterialTheme { EventCatalogPage(viewModel = EventsViewModel(repository), onOpenEvent = {}) }
 }

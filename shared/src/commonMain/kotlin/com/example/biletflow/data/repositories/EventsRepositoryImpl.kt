@@ -3,6 +3,7 @@ package com.example.biletflow.data.repositories
 import com.example.biletflow.core.network.apiBaseUrl
 import com.example.biletflow.core.network.createHttpClient
 import com.example.biletflow.domain.models.Event
+import com.example.biletflow.domain.models.TicketType
 import com.example.biletflow.domain.repositories.EventsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -23,6 +24,28 @@ class EventsRepositoryImpl(
             throw EventsApiException(
                 statusCode = response.status.value,
                 message = "Events request failed (${response.status.value})",
+            )
+        }
+        return response.body()
+    }
+
+    override suspend fun getEvent(eventId: Int): Event {
+        val response = client.get("$baseUrl/events/$eventId")
+        if (response.status.value !in 200..299) {
+            throw EventsApiException(
+                statusCode = response.status.value,
+                message = "Event request failed (${response.status.value})",
+            )
+        }
+        return response.body()
+    }
+
+    override suspend fun getTicketTypes(eventId: Int): List<TicketType> {
+        val response = client.get("$baseUrl/events/$eventId/ticket-types")
+        if (response.status.value !in 200..299) {
+            throw EventsApiException(
+                statusCode = response.status.value,
+                message = "Ticket types request failed (${response.status.value})",
             )
         }
         return response.body()

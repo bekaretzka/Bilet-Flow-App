@@ -3,6 +3,8 @@ package com.example.biletflow.presentation.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.biletflow.domain.repositories.AuthRepository
+import com.example.biletflow.data.repositories.AuthApiException
+import com.example.biletflow.domain.session.SessionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +18,8 @@ enum class AuthValidationError {
     PasswordMismatch,
 }
 
+enum class AuthRequestError { InvalidCredentials, Network }
+
 data class AuthFormState(
     val email: String = "",
     val password: String = "",
@@ -26,12 +30,13 @@ data class AuthFormState(
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
-    val errorMessage: String? = null,
+    val requestError: AuthRequestError? = null,
     val validationError: AuthValidationError? = null,
 )
 
 class AuthViewModel(
     private val repository: AuthRepository,
+    private val sessionStore: SessionStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AuthUiState())
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
@@ -63,7 +68,25 @@ class AuthViewModel(
     fun login() {
         validateLogin()?.let { setValidationError(it); return }
         val form = _form.value
-        submit { repository.login(form.email.trim(), form.password) }
+        if (_state.value.isLoading) return
+        viewModelScope.launch {
+            _state.value = AuthUiState(isLoading = true)
+            runCatching { repository.login(form.email.trim().lowercase(), form.password) }
+                .onSuccess { tokens ->
+                    sessionStore.save(tokens)
+                    _form.value = _form.value.copy(password = "")
+                    _state.value = AuthUiState(isSuccess = true)
+                }
+                .onFailure { error ->
+                    _state.value = AuthUiState(
+                        requestError = if (error is AuthApiException && error.statusCode == 401) {
+                            AuthRequestError.InvalidCredentials
+                        } else {
+                            AuthRequestError.Network
+                        },
+                    )
+                }
+        }
     }
 
     fun register() {
@@ -86,6 +109,13 @@ class AuthViewModel(
         _state.value = AuthUiState()
     }
 
+    fun closeLoginFlow() {
+        if (_state.value.isLoading) return
+        _form.value = _form.value.copy(password = "")
+        _state.value = AuthUiState()
+        _page.value = AuthPage.Login
+    }
+
     private fun clearRequestState() {
         if (_state.value.isLoading) return
         _state.value = AuthUiState()
@@ -95,7 +125,13 @@ class AuthViewModel(
         _state.value = AuthUiState(validationError = error)
     }
 
-    private fun validateLogin(): AuthValidationError? = validateCredentials()
+    private fun validateLogin(): AuthValidationError? {
+        val form = _form.value
+        if (form.email.isBlank()) return AuthValidationError.EmptyEmail
+        if (!form.email.contains("@") || !form.email.contains(".")) return AuthValidationError.InvalidEmail
+        if (form.password.isBlank()) return AuthValidationError.EmptyPassword
+        return null
+    }
 
     private fun validateRegistration(): AuthValidationError? {
         validateCredentials()?.let { return it }
@@ -121,8 +157,8 @@ class AuthViewModel(
                 .onSuccess {
                     _state.value = AuthUiState(isSuccess = true)
                 }
-                .onFailure { error ->
-                    _state.value = AuthUiState(errorMessage = error.message)
+                .onFailure {
+                    _state.value = AuthUiState(requestError = AuthRequestError.Network)
                 }
         }
     }

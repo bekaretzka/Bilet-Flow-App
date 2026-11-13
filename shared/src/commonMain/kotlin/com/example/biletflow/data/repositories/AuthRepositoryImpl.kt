@@ -2,9 +2,11 @@ package com.example.biletflow.data.repositories
 
 import com.example.biletflow.core.network.apiBaseUrl
 import com.example.biletflow.core.network.createHttpClient
+import com.example.biletflow.domain.models.AuthTokens
 import com.example.biletflow.domain.repositories.AuthRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.request.post
+import io.ktor.client.call.body
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -35,34 +37,36 @@ class AuthRepositoryImpl(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : AuthRepository {
 
-    override suspend fun login(email: String, password: String) {
-        execute("/auth/login", email, password)
+    override suspend fun login(email: String, password: String): AuthTokens {
+        val response = request("/auth/login", email, password)
+        if (response.status.value in 200..299) return response.body()
+        throw apiException(response.status.value, response.bodyAsText())
     }
 
     override suspend fun register(email: String, password: String) {
-        execute("/auth/register", email, password)
+        val response = request("/auth/register", email, password)
+        if (response.status.value !in 200..299) {
+            throw apiException(response.status.value, response.bodyAsText())
+        }
     }
 
-    private suspend fun execute(path: String, email: String, password: String) {
-        val response = client.post("$baseUrl$path") {
+    private suspend fun request(path: String, email: String, password: String) =
+        client.post("$baseUrl$path") {
             contentType(ContentType.Application.Json)
             setBody(AuthRequest(email = email, password = password))
         }
 
-        if (response.status.value in 200..299) return
-
-        val body = response.bodyAsText()
-        throw AuthApiException(
-            statusCode = response.status.value,
-            message = parseErrorMessage(body) ?: "Request failed (${response.status.value})",
-        )
-    }
+    private fun apiException(statusCode: Int, body: String) = AuthApiException(
+        statusCode = statusCode,
+        message = parseErrorMessage(body) ?: "Request failed ($statusCode)",
+    )
 
     private fun parseErrorMessage(body: String): String? {
         if (body.isBlank()) return null
 
         return runCatching {
-            val detail = json.parseToJsonElement(body).jsonObject["detail"]
+            val response = json.parseToJsonElement(body).jsonObject
+            val detail = response["detail"] ?: response["message"]
             when (detail) {
                 is JsonArray -> detail
                     .mapNotNull { item -> item.jsonObject["msg"]?.jsonPrimitive?.contentOrNull }

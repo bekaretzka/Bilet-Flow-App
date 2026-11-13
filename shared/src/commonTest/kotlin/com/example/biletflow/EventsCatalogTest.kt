@@ -3,6 +3,7 @@ package com.example.biletflow
 import com.example.biletflow.core.network.createMockEventsHttpClient
 import com.example.biletflow.data.repositories.EventsRepositoryImpl
 import com.example.biletflow.domain.models.Event
+import com.example.biletflow.domain.models.TicketType
 import com.example.biletflow.presentation.events.EventCategoryFilter
 import com.example.biletflow.presentation.events.EventsViewModel
 import com.example.biletflow.presentation.events.filterEvents
@@ -68,6 +69,8 @@ class EventsCatalogTest {
                     if (attempts == 1) error("Network unavailable")
                     return sampleEvents()
                 }
+                override suspend fun getEvent(eventId: Int) = sampleEvents().first { it.id == eventId }
+                override suspend fun getTicketTypes(eventId: Int) = emptyList<TicketType>()
             }
             val viewModel = EventsViewModel(repository)
             advanceUntilIdle()
