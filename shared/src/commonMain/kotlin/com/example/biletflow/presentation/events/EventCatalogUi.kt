@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -49,7 +50,11 @@ private val FieldBorder = Color(0xFFD9D5CC)
 private val Cover = Color(0xFFDDD7C7)
 
 @Composable
-fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: (Int) -> Unit) {
+fun EventCatalogPage(
+    viewModel: EventsViewModel,
+    onOpenEvent: (Int) -> Unit,
+    onOpenOrders: () -> Unit,
+) {
     val state by viewModel.state.collectAsState()
     val visibleEvents = filterEvents(state.events, state.query, state.category)
     val filters = listOf(
@@ -61,9 +66,9 @@ fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: (Int) -> Unit) {
 
     Column(
         modifier = Modifier.fillMaxSize().background(PageBackground)
-            .verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+            .statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
     ) {
-        CatalogHeader()
+        CatalogHeader(onOpenOrders)
         Spacer(Modifier.height(22.dp))
         OutlinedTextField(
             value = state.query,
@@ -104,21 +109,31 @@ fun EventCatalogPage(viewModel: EventsViewModel, onOpenEvent: (Int) -> Unit) {
 }
 
 @Composable
-private fun CatalogHeader() {
+private fun CatalogHeader(onOpenOrders: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text("BiletFlow", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Surface(shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
-            Text(
-                text = stringResource(Res.string.language_ru),
-                color = Ink,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TextButton(onClick = onOpenOrders) {
+                Text(
+                    stringResource(Res.string.order_history_action),
+                    color = Purple,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Surface(shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
+                Text(
+                    text = stringResource(Res.string.language_ru),
+                    color = Ink,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                )
+            }
         }
     }
 }
@@ -237,5 +252,11 @@ private fun EventCatalogPreview() {
         override suspend fun getEvent(eventId: Int) = previewEvent
         override suspend fun getTicketTypes(eventId: Int) = emptyList<TicketType>()
     }
-    MaterialTheme { EventCatalogPage(viewModel = EventsViewModel(repository), onOpenEvent = {}) }
+    MaterialTheme {
+        EventCatalogPage(
+            viewModel = EventsViewModel(repository),
+            onOpenEvent = {},
+            onOpenOrders = {},
+        )
+    }
 }

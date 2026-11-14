@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.biletflow.core.network.createHttpClient
@@ -24,6 +25,11 @@ import com.example.biletflow.presentation.events.EventsViewModel
 import com.example.biletflow.presentation.orderreview.OrderReviewPage
 import com.example.biletflow.presentation.orderreview.OrderCreationViewModel
 import com.example.biletflow.presentation.orderreview.OrderResultPage
+import com.example.biletflow.presentation.orderreview.OrderPaymentViewModel
+import com.example.biletflow.presentation.orderreview.TicketQrPage
+import com.example.biletflow.presentation.orderreview.TicketQrViewModel
+import com.example.biletflow.presentation.orderhistory.OrderHistoryPage
+import com.example.biletflow.presentation.orderhistory.OrderHistoryViewModel
 
 @Composable
 fun App(useMockEvents: Boolean = false) {
@@ -32,6 +38,10 @@ fun App(useMockEvents: Boolean = false) {
         var showOrderReview by remember { mutableStateOf(false) }
         var showLogin by remember { mutableStateOf(false) }
         var completedOrder by remember { mutableStateOf<Order?>(null) }
+        var selectedTicketId by remember { mutableStateOf<Int?>(null) }
+        var showOrderHistory by remember { mutableStateOf(false) }
+        var loginForHistory by remember { mutableStateOf(false) }
+        var orderOpenedFromHistory by remember { mutableStateOf(false) }
 
         val apiClient = remember(useMockEvents) {
             if (useMockEvents) createMockEventsHttpClient() else createHttpClient()
@@ -45,45 +55,137 @@ fun App(useMockEvents: Boolean = false) {
         val eventsViewModel: EventsViewModel = viewModel {
             EventsViewModel(eventsRepository)
         }
+        val eventsState by eventsViewModel.state.collectAsState()
         val eventDetailsViewModel: EventDetailsViewModel = viewModel {
             EventDetailsViewModel(eventsRepository)
         }
+        val eventDetailsState by eventDetailsViewModel.state.collectAsState()
         val authViewModel: AuthViewModel = viewModel {
             AuthViewModel(authRepository, sessionStore)
         }
         val orderViewModel: OrderCreationViewModel = viewModel {
             OrderCreationViewModel(ordersRepository, sessionStore)
         }
+        val paymentViewModel: OrderPaymentViewModel = viewModel {
+            OrderPaymentViewModel(ordersRepository, sessionStore)
+        }
+        val ticketQrViewModel: TicketQrViewModel = viewModel {
+            TicketQrViewModel(ordersRepository, sessionStore)
+        }
+        val orderHistoryViewModel: OrderHistoryViewModel = viewModel {
+            OrderHistoryViewModel(ordersRepository, sessionStore)
+        }
+        val orderHistoryState by orderHistoryViewModel.state.collectAsState()
+
+        LaunchedEffect(orderHistoryState.openedOrder?.id) {
+            orderHistoryState.openedOrder?.let { order ->
+                orderOpenedFromHistory = true
+                paymentViewModel.startOrder(order)
+                completedOrder = order
+                orderHistoryViewModel.consumeOpenedOrder()
+            }
+        }
 
         when {
-            completedOrder != null -> OrderResultPage(
-                order = requireNotNull(completedOrder),
-                onDone = {
-                    completedOrder = null
-                    selectedEventId = null
-                    showOrderReview = false
-                    eventDetailsViewModel.clearSelection()
-                    orderViewModel.reset()
-                },
-            )
             showLogin -> LoginPage(
                 viewModel = authViewModel,
                 onClose = {
                     authViewModel.closeLoginFlow()
                     showLogin = false
+                    if (loginForHistory) {
+                        loginForHistory = false
+                        showOrderHistory = false
+                        orderHistoryViewModel.close()
+                    }
                 },
                 onLoginSuccess = {
                     authViewModel.closeLoginFlow()
                     orderViewModel.clearError()
+                    paymentViewModel.clearAfterLogin()
+                    ticketQrViewModel.clearUnauthorizedAfterLogin()
                     showLogin = false
+                    if (loginForHistory) {
+                        loginForHistory = false
+                        showOrderHistory = true
+                        orderHistoryViewModel.open()
+                    }
+                },
+            )
+            selectedTicketId != null -> {
+                val ticket = requireNotNull(
+                    completedOrder?.tickets?.firstOrNull { it.id == selectedTicketId },
+                )
+                TicketQrPage(
+                    ticket = ticket,
+                    typeName = eventDetailsState.ticketTypes
+                        .firstOrNull { it.id == ticket.ticketTypeId }?.name,
+                    viewModel = ticketQrViewModel,
+                    onBack = { selectedTicketId = null },
+                    onLogin = {
+                        authViewModel.closeLoginFlow()
+                        showLogin = true
+                    },
+                )
+            }
+            completedOrder != null -> OrderResultPage(
+                order = requireNotNull(completedOrder),
+                viewModel = paymentViewModel,
+                onOrderUpdated = { completedOrder = it },
+                onLogin = {
+                    authViewModel.closeLoginFlow()
+                    showLogin = true
+                },
+                ticketTypeNames = eventDetailsState.ticketTypes.associate { it.id to it.name },
+                onOpenTicket = { selectedTicketId = it },
+                backToOrders = orderOpenedFromHistory,
+                onDone = {
+                    completedOrder = null
+                    paymentViewModel.reset()
+                    ticketQrViewModel.reset()
+                    selectedTicketId = null
+                    if (orderOpenedFromHistory) {
+                        orderOpenedFromHistory = false
+                        showOrderHistory = true
+                        orderHistoryViewModel.refreshAfterOrder()
+                    } else {
+                        selectedEventId = null
+                        showOrderReview = false
+                        eventDetailsViewModel.clearSelection()
+                        orderViewModel.reset()
+                    }
+                },
+            )
+            showOrderHistory -> OrderHistoryPage(
+                viewModel = orderHistoryViewModel,
+                eventNames = eventsState.events.associate { it.id to it.title },
+                onBack = {
+                    showOrderHistory = false
+                    orderHistoryViewModel.close()
+                },
+                onLogin = {
+                    loginForHistory = true
+                    authViewModel.closeLoginFlow()
+                    showLogin = true
                 },
             )
             selectedEventId == null -> EventCatalogPage(
                 viewModel = eventsViewModel,
                 onOpenEvent = { eventId ->
                     orderViewModel.reset()
+                    paymentViewModel.reset()
+                    ticketQrViewModel.reset()
                     selectedEventId = eventId
                     showOrderReview = false
+                },
+                onOpenOrders = {
+                    if (session == null) {
+                        loginForHistory = true
+                        authViewModel.closeLoginFlow()
+                        showLogin = true
+                    } else {
+                        showOrderHistory = true
+                        orderHistoryViewModel.open()
+                    }
                 },
             )
             showOrderReview -> OrderReviewPage(
@@ -100,7 +202,11 @@ fun App(useMockEvents: Boolean = false) {
                     showOrderReview = false
                     selectedEventId?.let(eventDetailsViewModel::loadTicketTypes)
                 },
-                onOrderCreated = { completedOrder = it },
+                onOrderCreated = {
+                    orderOpenedFromHistory = false
+                    paymentViewModel.startOrder(it)
+                    completedOrder = it
+                },
             )
             else -> EventDetailsPage(
                 eventId = requireNotNull(selectedEventId),
@@ -109,6 +215,8 @@ fun App(useMockEvents: Boolean = false) {
                     selectedEventId = null
                     showOrderReview = false
                     orderViewModel.reset()
+                    paymentViewModel.reset()
+                    ticketQrViewModel.reset()
                 },
                 onContinue = { showOrderReview = true },
             )

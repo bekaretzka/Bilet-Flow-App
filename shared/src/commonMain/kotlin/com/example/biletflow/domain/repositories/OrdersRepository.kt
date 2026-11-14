@@ -10,4 +10,12 @@ interface OrdersRepository {
         items: List<CreateOrderItem>,
         accessToken: String,
     ): Order
+
+    suspend fun payOrder(orderId: Int, accessToken: String): Order
+
+    suspend fun getOrder(orderId: Int, accessToken: String): Order
+
+    suspend fun getMyOrders(accessToken: String): List<Order>
+
+    suspend fun getTicketQr(ticketId: Int, accessToken: String): ByteArray
 }
