@@ -33,11 +33,17 @@ class OrderHistoryViewModel(
     private val _state = MutableStateFlow(OrderHistoryUiState())
     val state: StateFlow<OrderHistoryUiState> = _state.asStateFlow()
     private var sessionKey: String? = null
+    private var generation = sessionStore.generation
 
     init {
         viewModelScope.launch {
             sessionStore.tokens.collect { tokens ->
                 val newKey = tokens?.accessToken
+                if (generation == sessionStore.generation && newKey != null) {
+                    sessionKey = newKey
+                    return@collect
+                }
+                generation = sessionStore.generation
                 if (newKey == sessionKey) return@collect
                 sessionKey = newKey
                 val active = _state.value.isActive
@@ -78,6 +84,7 @@ class OrderHistoryViewModel(
     }
 
     fun openOrder(orderId: Int) {
+        val requestGeneration = sessionStore.generation
         val token = sessionStore.tokens.value?.accessToken
         if (token == null) {
             _state.value = _state.value.copy(error = OrderHistoryError.Unauthorized)
@@ -92,6 +99,7 @@ class OrderHistoryViewModel(
         viewModelScope.launch {
             try {
                 val order = repository.getOrder(orderId, token)
+                if (requestGeneration != sessionStore.generation) return@launch
                 if (_state.value.openingOrderId == orderId && sessionKey == token) {
                     _state.value = _state.value.copy(
                         openingOrderId = null,
@@ -99,6 +107,7 @@ class OrderHistoryViewModel(
                     )
                 }
             } catch (throwable: Throwable) {
+                if (requestGeneration != sessionStore.generation) return@launch
                 if (throwable is CancellationException) throw throwable
                 if (_state.value.openingOrderId != orderId || sessionKey != token) return@launch
                 val unauthorized = (throwable as? OrdersApiException)?.statusCode == 401
@@ -123,6 +132,7 @@ class OrderHistoryViewModel(
     }
 
     private fun load(token: String) {
+        val requestGeneration = sessionStore.generation
         _state.value = _state.value.copy(isLoading = true, orders = emptyList(), error = null)
         viewModelScope.launch {
             try {
@@ -131,10 +141,12 @@ class OrderHistoryViewModel(
                         runCatching { Instant.parse(it.createdAt) }.getOrNull()
                     }.thenByDescending { it.createdAt },
                 )
+                if (requestGeneration != sessionStore.generation) return@launch
                 if (sessionKey == token && _state.value.isActive) {
                     _state.value = _state.value.copy(isLoading = false, orders = orders, error = null)
                 }
             } catch (throwable: Throwable) {
+                if (requestGeneration != sessionStore.generation) return@launch
                 if (throwable is CancellationException) throw throwable
                 if (sessionKey != token || !_state.value.isActive) return@launch
                 val unauthorized = (throwable as? OrdersApiException)?.statusCode == 401

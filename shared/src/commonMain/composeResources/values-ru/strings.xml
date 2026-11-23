@@ -1,10 +1,17 @@
 <resources>
+    <string name="nav_events">Афиша</string>
+    <string name="nav_profile">Профиль</string>
+    <string name="profile_guest">Войдите, чтобы управлять билетами и заказами.</string>
+    <string name="profile_signed_in">Вы вошли в аккаунт.</string>
+    <string name="session_restoring">Восстановление сессии…</string>
+    <string name="session_storage_error">Не удалось прочитать или сохранить сессию. Вход может не сохраниться после перезапуска.</string>
     <string name="brand_name">BiletFlow</string>
+    <string name="auth_logout">Выйти</string>
 
     <string name="auth_login_title">Вход</string>
     <string name="auth_login_subtitle">Билеты и заказы привязаны к вашей почте.</string>
     <string name="auth_registration_title">Регистрация</string>
-    <string name="auth_registration_subtitle">После регистрации подтвердите почту — без этого билеты не приходят.</string>
+    <string name="auth_registration_subtitle">Создайте аккаунт, затем войдите, чтобы продолжить.</string>
 
     <string name="auth_email_label">Email</string>
     <string name="auth_password_label">Пароль</string>
@@ -12,7 +19,7 @@
     <string name="auth_email_placeholder">name@example.kz</string>
     <string name="auth_password_placeholder">••••••••</string>
     <string name="auth_name_placeholder">Будет указано на билете</string>
-    <string name="auth_password_registration_placeholder">Минимум 8 символов</string>
+    <string name="auth_password_registration_placeholder">Минимум 6 символов</string>
     <string name="auth_confirm_password_label">Подтвердите пароль</string>
     <string name="auth_confirm_password_placeholder">Повторите пароль</string>
 
@@ -29,7 +36,10 @@
     <string name="auth_error_email_required">Введите email.</string>
     <string name="auth_error_email_invalid">Введите корректный email.</string>
     <string name="auth_error_password_required">Введите пароль.</string>
-    <string name="auth_error_password_short">Пароль должен содержать минимум 8 символов.</string>
+    <string name="auth_error_password_short">Пароль должен содержать минимум 6 символов.</string>
+    <string name="auth_account_created">Аккаунт создан. Войдите.</string>
+    <string name="auth_error_existing_email">Этот email уже зарегистрирован.</string>
+    <string name="auth_error_fields">Проверьте email и пароль. Сервер отклонил поля формы.</string>
     <string name="auth_error_password_mismatch">Пароли не совпадают.</string>
     <string name="auth_close">Закрыть</string>
     <string name="auth_error_invalid_credentials">Неверный email или пароль.</string>
@@ -156,6 +166,14 @@
     <string name="order_status_cancelled">Отменён</string>
     <string name="order_status_refunded">Возвращён</string>
     <string name="order_result_back_to_orders">Вернуться к моим заказам</string>
+    <string name="order_cancel_action">Отменить заказ</string>
+    <string name="order_cancel_dialog_title">Отменить заказ?</string>
+    <string name="order_cancel_dialog_message">Заказ будет отменён. Это действие нельзя отменить.</string>
+    <string name="order_cancel_confirm">Отменить заказ</string>
+    <string name="order_cancel_keep">Оставить заказ</string>
+    <string name="order_result_cancelled">Заказ отменён</string>
+    <string name="order_cancel_error_unknown">Ответ сервера не получен. Не отменяйте и не оплачивайте повторно, пока не проверите статус заказа.</string>
+    <string name="order_cancel_error_server">Не удалось отменить заказ. Попробуйте ещё раз.</string>
     <string name="ticket_standard">Стандарт</string>
     <string name="ticket_standard_price">4 000 ₸</string>
     <string name="ticket_standard_old_price">5 000 ₸</string>

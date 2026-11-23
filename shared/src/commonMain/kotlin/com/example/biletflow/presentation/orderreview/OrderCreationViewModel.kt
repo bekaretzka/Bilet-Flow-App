@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 
 enum class OrderCreationError { InvalidName, Unauthorized, Conflict, UnknownResult, Server }
 
@@ -90,6 +91,7 @@ class OrderCreationViewModel(
     }
 
     fun reset() {
+        viewModelScope.coroutineContext.cancelChildren()
         _state.value = OrderCreationUiState()
     }
 }

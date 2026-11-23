@@ -1,4 +1,5 @@
 package com.example.biletflow
+import biletflow.shared.generated.resources.*
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -6,8 +7,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.biletflow.data.repositories.SessionOrdersRepository
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.biletflow.core.network.createHttpClient
 import com.example.biletflow.core.network.createMockEventsHttpClient
@@ -32,7 +42,9 @@ import com.example.biletflow.presentation.orderhistory.OrderHistoryPage
 import com.example.biletflow.presentation.orderhistory.OrderHistoryViewModel
 
 @Composable
-fun App(useMockEvents: Boolean = false) {
+fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.domain.session.SessionStorage? = null,
+    registerBack: (((() -> Unit)?) -> Unit)? = null,
+) {
     MaterialTheme {
         var selectedEventId by remember { mutableStateOf<Int?>(null) }
         var showOrderReview by remember { mutableStateOf(false) }
@@ -42,14 +54,35 @@ fun App(useMockEvents: Boolean = false) {
         var showOrderHistory by remember { mutableStateOf(false) }
         var loginForHistory by remember { mutableStateOf(false) }
         var orderOpenedFromHistory by remember { mutableStateOf(false) }
+        var selectedTab by remember { mutableStateOf(0) }
+        val catalogScroll = rememberScrollState()
 
         val apiClient = remember(useMockEvents) {
             if (useMockEvents) createMockEventsHttpClient() else createHttpClient()
         }
         val eventsRepository = remember(apiClient) { EventsRepositoryImpl(client = apiClient) }
         val authRepository = remember(apiClient) { AuthRepositoryImpl(client = apiClient) }
-        val ordersRepository = remember(apiClient) { OrdersRepositoryImpl(client = apiClient) }
-        val sessionStore = remember { SessionStore() }
+        val sessionScope = rememberCoroutineScope()
+        val sessionStore = remember { SessionStore(sessionStorage, sessionScope) }
+        val restoring by sessionStore.restoring.collectAsState()
+        val storageError by sessionStore.storageError.collectAsState()
+        LaunchedEffect(sessionStore) { sessionStore.restore() }
+        if (restoring) {
+            androidx.compose.material3.Text(org.jetbrains.compose.resources.stringResource(biletflow.shared.generated.resources.Res.string.session_restoring))
+            return@MaterialTheme
+        }
+        if (storageError) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = {},
+                text = { androidx.compose.material3.Text(org.jetbrains.compose.resources.stringResource(biletflow.shared.generated.resources.Res.string.session_storage_error)) },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = { sessionStore.dismissStorageError() }) {
+                    androidx.compose.material3.Text("OK")
+                } },
+            )
+        }
+        val ordersRepository = remember(apiClient) {
+            SessionOrdersRepository(OrdersRepositoryImpl(client = apiClient), authRepository, sessionStore, sessionScope)
+        }
         val session by sessionStore.tokens.collectAsState()
 
         val eventsViewModel: EventsViewModel = viewModel {
@@ -76,6 +109,72 @@ fun App(useMockEvents: Boolean = false) {
             OrderHistoryViewModel(ordersRepository, sessionStore)
         }
         val orderHistoryState by orderHistoryViewModel.state.collectAsState()
+        var previousAccount by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(session?.email) {
+            val account = session?.email
+            if (account != null) {
+                if (previousAccount != null && previousAccount != account) {
+                    completedOrder = null
+                    selectedTicketId = null
+                    selectedEventId = null
+                    showOrderReview = false
+                    orderOpenedFromHistory = false
+                    orderViewModel.reset()
+                    paymentViewModel.reset()
+                    ticketQrViewModel.reset()
+                    eventDetailsViewModel.clearSelection()
+                    orderHistoryViewModel.close()
+                    if (selectedTab == 1) orderHistoryViewModel.open()
+                }
+                previousAccount = account
+            }
+        }
+
+        val logout = {
+            authViewModel.logout()
+            orderHistoryViewModel.close()
+            orderViewModel.reset()
+            paymentViewModel.reset()
+            ticketQrViewModel.reset()
+            eventDetailsViewModel.clearSelection()
+            completedOrder = null
+            selectedTicketId = null
+            selectedEventId = null
+            showOrderHistory = false
+            showOrderReview = false
+            showLogin = false
+            loginForHistory = false
+            orderOpenedFromHistory = false
+            selectedTab = 0
+        }
+        val isRoot = !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
+        val backAction: (() -> Unit)? = when {
+            showLogin -> ({
+                if (authViewModel.page.value == com.example.biletflow.presentation.auth.AuthPage.Registration) {
+                    authViewModel.openLogin()
+                } else if (!authViewModel.state.value.isLoading) {
+                    authViewModel.closeLoginFlow(); showLogin = false; loginForHistory = false
+                }
+            })
+            selectedTicketId != null -> ({ selectedTicketId = null })
+            completedOrder != null -> ({
+                completedOrder = null; paymentViewModel.reset(); ticketQrViewModel.reset()
+                if (orderOpenedFromHistory) {
+                    selectedTab = 1; showOrderHistory = true; orderHistoryViewModel.refreshAfterOrder()
+                } else {
+                    selectedEventId = null; showOrderReview = false; selectedTab = 0
+                    eventDetailsViewModel.clearSelection(); orderViewModel.reset()
+                }
+            })
+            showOrderReview -> ({ showOrderReview = false })
+            selectedEventId != null -> ({ selectedEventId = null })
+            selectedTab != 0 -> ({ selectedTab = 0; showOrderHistory = false; orderHistoryViewModel.close() })
+            else -> null
+        }
+        DisposableEffect(backAction) {
+            registerBack?.invoke(backAction)
+            onDispose { registerBack?.invoke(null) }
+        }
 
         LaunchedEffect(orderHistoryState.openedOrder?.id) {
             orderHistoryState.openedOrder?.let { order ->
@@ -86,6 +185,8 @@ fun App(useMockEvents: Boolean = false) {
             }
         }
 
+        Column(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
             showLogin -> LoginPage(
                 viewModel = authViewModel,
@@ -94,7 +195,7 @@ fun App(useMockEvents: Boolean = false) {
                     showLogin = false
                     if (loginForHistory) {
                         loginForHistory = false
-                        showOrderHistory = false
+                        showOrderHistory = selectedTab == 1
                         orderHistoryViewModel.close()
                     }
                 },
@@ -155,10 +256,36 @@ fun App(useMockEvents: Boolean = false) {
                     }
                 },
             )
+            isRoot && selectedTab == 2 -> Column(
+                Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Text(stringResource(Res.string.nav_profile), style = MaterialTheme.typography.headlineLarge)
+                Text(session?.email ?: stringResource(
+                    if (session == null) Res.string.profile_guest else Res.string.profile_signed_in,
+                ))
+                if (session == null) Button(onClick = {
+                    loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
+                }) { Text(stringResource(Res.string.auth_login_button)) }
+                else Button(onClick = logout) { Text(stringResource(Res.string.auth_logout)) }
+            }
+            isRoot && selectedTab == 1 && session == null -> Column(
+                Modifier.fillMaxSize().statusBarsPadding().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Text(stringResource(Res.string.order_history_title), style = MaterialTheme.typography.headlineLarge)
+                Text(stringResource(Res.string.order_history_session_expired))
+                Button(onClick = { loginForHistory = true; showLogin = true }) {
+                    Text(stringResource(Res.string.auth_login_button))
+                }
+            }
             showOrderHistory -> OrderHistoryPage(
+                isAuthenticated = session != null,
+                onLogout = logout,
                 viewModel = orderHistoryViewModel,
                 eventNames = eventsState.events.associate { it.id to it.title },
                 onBack = {
+                    selectedTab = 0
                     showOrderHistory = false
                     orderHistoryViewModel.close()
                 },
@@ -169,6 +296,7 @@ fun App(useMockEvents: Boolean = false) {
                 },
             )
             selectedEventId == null -> EventCatalogPage(
+                scrollState = catalogScroll,
                 viewModel = eventsViewModel,
                 onOpenEvent = { eventId ->
                     orderViewModel.reset()
@@ -178,6 +306,7 @@ fun App(useMockEvents: Boolean = false) {
                     showOrderReview = false
                 },
                 onOpenOrders = {
+                    selectedTab = 1
                     if (session == null) {
                         loginForHistory = true
                         authViewModel.closeLoginFlow()
@@ -220,6 +349,31 @@ fun App(useMockEvents: Boolean = false) {
                 },
                 onContinue = { showOrderReview = true },
             )
+        }
+        }
+        if (isRoot) NavigationBar {
+            val labels = listOf(stringResource(Res.string.nav_events), stringResource(Res.string.order_history_title), stringResource(Res.string.nav_profile))
+            labels.forEachIndexed { index, label ->
+                NavigationBarItem(
+                    selected = selectedTab == index,
+                    onClick = {
+                        if (selectedTab != index) {
+                            selectedTab = index
+                            showOrderHistory = index == 1
+                            if (index == 1 && session != null) orderHistoryViewModel.open()
+                            else orderHistoryViewModel.close()
+                            if (index == 1 && session == null) {
+                                loginForHistory = true
+                                authViewModel.closeLoginFlow()
+                                showLogin = true
+                            }
+                        }
+                    },
+                    icon = { Text(listOf("▦", "▤", "○")[index], modifier = Modifier) },
+                    label = { Text(label) },
+                )
+            }
+        }
         }
     }
 }

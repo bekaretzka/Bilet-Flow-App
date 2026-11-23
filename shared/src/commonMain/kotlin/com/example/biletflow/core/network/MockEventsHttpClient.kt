@@ -24,9 +24,19 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 fun createMockEventsHttpClient(): HttpClient {
+    val consumedRefreshTokens = mutableSetOf<String>()
+    val accessAliases = mutableMapOf<String, String>()
+    val refreshOwners = mutableMapOf(
+        "mock-refresh-token" to "Bearer mock-access-token",
+        "mock-empty-refresh-token" to "Bearer mock-empty-access-token",
+        "mock-history-offline-refresh-token" to "Bearer mock-history-offline-token",
+    )
+    var rotation = 0
+    val registeredUsers = mutableMapOf<String, String>()
     var event104TicketAttempts = 0
     val mockOrders = mutableMapOf<Int, String>()
     val paymentAttempts = mutableMapOf<Int, Int>()
+    val cancellationAttempts = mutableMapOf<Int, Int>()
     val qrAttempts = mutableMapOf<Int, Int>()
     mockOrders[7101] = mockOrderResponse(
         orderId = 7101,
@@ -42,9 +52,60 @@ fun createMockEventsHttpClient(): HttpClient {
         items = listOf(1002 to 1),
         createdAt = "2026-11-11T12:00:00+05:00",
     )
+    mockOrders[7103] = mockOrderResponse(
+        orderId = 7103,
+        eventId = 102,
+        buyerName = "Cancel Unknown",
+        items = listOf(2002 to 1),
+        createdAt = "2026-11-13T10:00:00+05:00",
+    )
     return HttpClient(MockEngine { request ->
         val path = request.url.encodedPath
+        val rawAuthorization = request.headers[HttpHeaders.Authorization]
+        val authorizationHeader = accessAliases[rawAuthorization] ?: rawAuthorization
         when {
+            request.method == HttpMethod.Post && path == "/auth/refresh" -> {
+                val body = (request.body as? OutgoingContent.ByteArrayContent)?.bytes()?.decodeToString().orEmpty()
+                val refresh = Json.parseToJsonElement(body).jsonObject["refresh_token"]?.jsonPrimitive?.content.orEmpty()
+                val owner = refreshOwners[refresh] ?: refresh.removePrefix("mock-refresh-")
+                    .toIntOrNull()?.takeIf { it in registeredUsers.values.indices }?.let { "Bearer mock-user-$it" }
+                if (owner == null || !consumedRefreshTokens.add(refresh)) {
+                    respondJson("""{"error":"InvalidRefreshTokenError","message":"Invalid refresh token","fields":null}""", HttpStatusCode.Unauthorized)
+                } else {
+                    rotation++
+                    val access = "mock-rotated-access-$rotation"
+                    accessAliases["Bearer $access"] = owner
+                    refreshOwners["mock-rotated-refresh-$rotation"] = owner
+                    respondJson(buildJsonObject {
+                        put("access_token", access)
+                        put("refresh_token", "mock-rotated-refresh-$rotation")
+                        put("token_type", "bearer")
+                    }.toString(), HttpStatusCode.OK)
+                }
+            }
+            request.method == HttpMethod.Post && path == "/auth/logout" -> {
+                val body = (request.body as? OutgoingContent.ByteArrayContent)?.bytes()?.decodeToString().orEmpty()
+                val refresh = Json.parseToJsonElement(body).jsonObject["refresh_token"]?.jsonPrimitive?.content
+                if (refresh == "mock-history-offline-refresh-token") throw IOException("Mock logout unavailable")
+                respondJson("{}", HttpStatusCode.OK)
+            }
+            request.method == HttpMethod.Post && path == "/auth/register" -> {
+                val body = (request.body as? OutgoingContent.ByteArrayContent)?.bytes()?.decodeToString().orEmpty()
+                val payload = Json.parseToJsonElement(body).jsonObject
+                val email = payload["email"]?.jsonPrimitive?.content.orEmpty()
+                val password = payload["password"]?.jsonPrimitive?.content.orEmpty()
+                when {
+                    email == "register-offline@biletflow.kz" -> throw IOException("Mock registration unavailable")
+                    email in registeredUsers || email in setOf("visitor@biletflow.kz", "empty@biletflow.kz", "history-offline@biletflow.kz") ->
+                        respondJson("""{"error":"UserAlreadyExistsError","message":"User already exists","fields":null}""", HttpStatusCode.Conflict)
+                    password.length < 6 || !email.contains('@') ->
+                        respondJson(MOCK_ORDER_VALIDATION_JSON, HttpStatusCode.UnprocessableEntity)
+                    else -> {
+                        registeredUsers[email] = password
+                        respondJson(buildJsonObject { put("id", 100 + registeredUsers.size); put("email", email) }.toString(), HttpStatusCode.Created)
+                    }
+                }
+            }
             request.method == HttpMethod.Post && path == "/auth/login" -> {
                 val body = (request.body as? OutgoingContent.ByteArrayContent)
                     ?.bytes()
@@ -54,6 +115,13 @@ fun createMockEventsHttpClient(): HttpClient {
                 val email = credentials?.get("email")?.jsonPrimitive?.content
                 val password = credentials?.get("password")?.jsonPrimitive?.content
                 when {
+                    email != null && registeredUsers[email] == password -> respondJson(
+                        buildJsonObject {
+                            put("access_token", "mock-user-${registeredUsers.keys.indexOf(email)}")
+                            put("refresh_token", "mock-refresh-${registeredUsers.keys.indexOf(email)}")
+                            put("token_type", "bearer")
+                        }.toString(), HttpStatusCode.OK,
+                    )
                     email == "offline@biletflow.kz" -> throw IOException("Mock network unavailable")
                     email == "visitor@biletflow.kz" && password == "password123" ->
                         respondJson(MOCK_LOGIN_SUCCESS_JSON, HttpStatusCode.OK)
@@ -65,7 +133,7 @@ fun createMockEventsHttpClient(): HttpClient {
                 }
             }
             request.method == HttpMethod.Post && path.matches(Regex("/events/\\d+/orders")) -> {
-                val authorization = request.headers[HttpHeaders.Authorization]
+                val authorization = authorizationHeader
                 if (authorization != "Bearer mock-access-token") {
                     respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
                 } else {
@@ -110,7 +178,7 @@ fun createMockEventsHttpClient(): HttpClient {
                 }
             }
             request.method == HttpMethod.Post && path.matches(Regex("/orders/\\d+/pay")) -> {
-                if (request.headers[HttpHeaders.Authorization] != "Bearer mock-access-token") {
+                if (authorizationHeader != "Bearer mock-access-token") {
                     respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
                 } else {
                     val orderId = path.removePrefix("/orders/").substringBefore('/').toInt()
@@ -142,8 +210,48 @@ fun createMockEventsHttpClient(): HttpClient {
                     }
                 }
             }
+            request.method == HttpMethod.Post && path.matches(Regex("/orders/\\d+/cancel")) -> {
+                if (authorizationHeader != "Bearer mock-access-token") {
+                    respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
+                } else {
+                    val orderId = path.removePrefix("/orders/").substringBefore('/').toInt()
+                    val orderJson = mockOrders[orderId]
+                    val body = (request.body as? OutgoingContent.ByteArrayContent)
+                        ?.bytes()?.decodeToString().orEmpty()
+                    val validEmptyObject = runCatching {
+                        Json.parseToJsonElement(body).jsonObject.isEmpty()
+                    }.getOrDefault(false)
+                    if (!validEmptyObject) {
+                        respondJson(MOCK_ORDER_VALIDATION_JSON, HttpStatusCode.UnprocessableEntity)
+                    } else if (orderJson == null) {
+                        respondJson(MOCK_ORDER_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                    } else {
+                        val order = Json.parseToJsonElement(orderJson).jsonObject
+                        val status = order["status"]?.jsonPrimitive?.content
+                        val total = order["total_amount"]?.jsonPrimitive?.int ?: 0
+                        val cancellable = status == "pending" || (status == "confirmed" && total == 0)
+                        when {
+                            !cancellable -> respondJson(MOCK_ORDER_NOT_CANCELLABLE_JSON, HttpStatusCode.Conflict)
+                            orderId == 7103 && cancellationAttempts.getOrElse(orderId) { 0 } == 0 -> {
+                                cancellationAttempts[orderId] = 1
+                                mockOrders[orderId] = mockCancelledOrderResponse(orderJson)
+                                throw IOException("Mock connection interrupted after cancellation was processed")
+                            }
+                            else -> {
+                                cancellationAttempts[orderId] = cancellationAttempts.getOrElse(orderId) { 0 } + 1
+                                val cancelled = mockCancelledOrderResponse(orderJson)
+                                mockOrders[orderId] = cancelled
+                                respondJson(cancelled, HttpStatusCode.OK)
+                            }
+                        }
+                    }
+                }
+            }
             request.method == HttpMethod.Get && path == "/orders/me" -> {
-                when (request.headers[HttpHeaders.Authorization]) {
+                if (request.headers[HttpHeaders.Authorization]?.startsWith("Bearer mock-user-") == true) {
+                    respondJson("[]", HttpStatusCode.OK)
+                } else
+                when (authorizationHeader) {
                     "Bearer mock-access-token" -> respondJson(
                         buildJsonArray {
                             mockOrders.values.forEach { add(Json.parseToJsonElement(it)) }
@@ -156,7 +264,7 @@ fun createMockEventsHttpClient(): HttpClient {
                 }
             }
             request.method == HttpMethod.Get && path.matches(Regex("/orders/\\d+")) -> {
-                if (request.headers[HttpHeaders.Authorization] != "Bearer mock-access-token") {
+                if (authorizationHeader != "Bearer mock-access-token") {
                     respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
                 } else {
                     val orderId = path.substringAfterLast('/').toInt()
@@ -165,7 +273,7 @@ fun createMockEventsHttpClient(): HttpClient {
                 }
             }
             request.method == HttpMethod.Get && path.matches(Regex("/tickets/\\d+/qr")) -> {
-                if (request.headers[HttpHeaders.Authorization] != "Bearer mock-access-token") {
+                if (authorizationHeader != "Bearer mock-access-token") {
                     respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
                 } else {
                     val ticketId = path.removePrefix("/tickets/").substringBefore('/').toInt()
@@ -315,6 +423,16 @@ private fun mockPaidOrderResponse(orderJson: String): String {
     }.toString()
 }
 
+private fun mockCancelledOrderResponse(orderJson: String): String {
+    val original = Json.parseToJsonElement(orderJson).jsonObject
+    return buildJsonObject {
+        original.forEach { (key, value) -> put(key, value) }
+        put("status", "cancelled")
+        put("expires_at", JsonNull)
+        put("cancelled_at", "2026-11-14T10:00:00+05:00")
+    }.toString()
+}
+
 private fun io.ktor.client.engine.mock.MockRequestHandleScope.respondJson(
     content: String,
     status: HttpStatusCode,
@@ -372,6 +490,10 @@ private const val MOCK_PAYMENT_DECLINED_JSON = """
 
 private const val MOCK_ORDER_EXPIRED_JSON = """
 {"error":"OrderExpiredError","message":"Order has expired","fields":null}
+"""
+
+private const val MOCK_ORDER_NOT_CANCELLABLE_JSON = """
+{"error":"OrderNotCancellableError","message":"Order cannot be cancelled","fields":null}
 """
 
 private const val MOCK_ORDER_NOT_FOUND_JSON = """

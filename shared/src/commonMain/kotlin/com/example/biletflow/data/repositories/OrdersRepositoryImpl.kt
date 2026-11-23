@@ -57,6 +57,15 @@ class OrdersRepositoryImpl(
         return response.asOrderOrThrow(expectedStatus = 200)
     }
 
+    override suspend fun cancelOrder(orderId: Int, accessToken: String): Order {
+        val response = client.post("$baseUrl/orders/$orderId/cancel") {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(JsonObject(emptyMap()))
+        }
+        return response.asOrderOrThrow(expectedStatus = 200)
+    }
+
     override suspend fun getOrder(orderId: Int, accessToken: String): Order {
         val response = client.get("$baseUrl/orders/$orderId") {
             bearerAuth(accessToken)

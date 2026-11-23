@@ -16,13 +16,18 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,9 +58,14 @@ fun OrderResultPage(
 ) {
     val paymentState by viewModel.state.collectAsState()
     val confirmed = order.status.equals("confirmed", ignoreCase = true)
+    val cancelled = order.status.equals("cancelled", ignoreCase = true)
     val pending = order.status.equals("pending", ignoreCase = true)
     val expired = pending && !orderCanBePaid(order)
-    val busy = paymentState.isPaying || paymentState.isCheckingStatus
+    val busy = paymentState.isPaying || paymentState.isCancelling || paymentState.isCheckingStatus
+    val mustCheckStatus = paymentState.error == PaymentError.UnknownResult ||
+        paymentState.error == PaymentError.CancellationUnknown ||
+        paymentState.error == PaymentError.StatusCheckFailed
+    var showCancelDialog by remember(order.id) { mutableStateOf(false) }
 
     LaunchedEffect(order.id) { viewModel.startOrder(order) }
     LaunchedEffect(paymentState.updatedOrder) {
@@ -66,6 +76,8 @@ fun OrderResultPage(
     }
     val statusText = if (confirmed) {
         stringResource(Res.string.order_result_confirmed)
+    } else if (cancelled) {
+        stringResource(Res.string.order_result_cancelled)
     } else if (pending && (expired || paymentState.error == PaymentError.Expired)) {
         stringResource(Res.string.payment_expired)
     } else if (pending) {
@@ -100,16 +112,33 @@ fun OrderResultPage(
                     }
                 }
             }
-            if (pending) {
+            if (pending || orderCanBeCancelled(order)) {
                 Spacer(Modifier.height(18.dp))
                 PaymentErrorMessage(paymentState.error, expired)
-                when (paymentState.error) {
+                if (!pending && paymentState.error == PaymentError.Unauthorized) {
+                    ResultActionButton(
+                        text = stringResource(Res.string.payment_login_again),
+                        onClick = onLogin,
+                        enabled = !busy,
+                    )
+                } else if (!pending && mustCheckStatus) {
+                    ResultActionButton(
+                        text = stringResource(Res.string.payment_check_status),
+                        onClick = { viewModel.checkStatus(order.id) },
+                        enabled = !busy,
+                        loading = paymentState.isCheckingStatus,
+                    )
+                }
+                if (pending) when (paymentState.error) {
                     PaymentError.Unauthorized -> ResultActionButton(
                         text = stringResource(Res.string.payment_login_again),
                         onClick = onLogin,
                         enabled = !busy,
                     )
-                    PaymentError.UnknownResult, PaymentError.StatusCheckFailed -> ResultActionButton(
+                    PaymentError.UnknownResult,
+                    PaymentError.CancellationUnknown,
+                    PaymentError.StatusCheckFailed,
+                    -> ResultActionButton(
                         text = stringResource(Res.string.payment_check_status),
                         onClick = { viewModel.checkStatus(order.id) },
                         enabled = !busy,
@@ -122,6 +151,35 @@ fun OrderResultPage(
                         enabled = !busy && !expired,
                         loading = paymentState.isPaying,
                     )
+                }
+                if (orderCanBeCancelled(order) && paymentState.error != PaymentError.Unauthorized &&
+                    !mustCheckStatus
+                ) {
+                    if (pending) Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = { showCancelDialog = true },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFFB3261E),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        if (paymentState.isCancelling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.height(22.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text(
+                                stringResource(Res.string.order_cancel_action),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                 }
             }
             if (confirmed) {
@@ -165,6 +223,29 @@ fun OrderResultPage(
             )
         }
     }
+
+    if (showCancelDialog) {
+        AlertDialog(
+            onDismissRequest = { showCancelDialog = false },
+            title = { Text(stringResource(Res.string.order_cancel_dialog_title)) },
+            text = { Text(stringResource(Res.string.order_cancel_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showCancelDialog = false
+                        viewModel.cancel(order)
+                    },
+                ) {
+                    Text(stringResource(Res.string.order_cancel_confirm), color = Color(0xFFB3261E))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelDialog = false }) {
+                    Text(stringResource(Res.string.order_cancel_keep))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -207,8 +288,10 @@ private fun PaymentErrorMessage(error: PaymentError?, locallyExpired: Boolean) {
         error == PaymentError.Declined -> stringResource(Res.string.payment_error_declined)
         error == PaymentError.Unauthorized -> stringResource(Res.string.payment_error_unauthorized)
         error == PaymentError.UnknownResult -> stringResource(Res.string.payment_error_unknown)
+        error == PaymentError.CancellationUnknown -> stringResource(Res.string.order_cancel_error_unknown)
         error == PaymentError.StatusCheckFailed -> stringResource(Res.string.payment_error_status_check)
         error == PaymentError.Server -> stringResource(Res.string.payment_error_server)
+        error == PaymentError.CancellationServer -> stringResource(Res.string.order_cancel_error_server)
         else -> null
     } ?: return
     Text(text, color = Color(0xFFB3261E), fontSize = 14.sp, lineHeight = 20.sp)

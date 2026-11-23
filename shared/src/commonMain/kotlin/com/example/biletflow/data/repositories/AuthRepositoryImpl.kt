@@ -26,6 +26,9 @@ private data class AuthRequest(
     val password: String,
 )
 
+@Serializable
+private data class RegisteredUser(val id: Int, val email: String)
+
 class AuthApiException(
     val statusCode: Int,
     override val message: String,
@@ -36,6 +39,25 @@ class AuthRepositoryImpl(
     private val baseUrl: String = apiBaseUrl,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : AuthRepository {
+    override suspend fun refresh(refreshToken: String): AuthTokens {
+        val response = client.post("$baseUrl/auth/refresh") {
+            contentType(ContentType.Application.Json)
+            setBody(kotlinx.serialization.json.buildJsonObject {
+                put("refresh_token", JsonPrimitive(refreshToken))
+            })
+        }
+        if (response.status.value == 200) return response.body()
+        throw apiException(response.status.value, response.bodyAsText())
+    }
+    override suspend fun logout(refreshToken: String) {
+        val response = client.post("$baseUrl/auth/logout") {
+            contentType(ContentType.Application.Json)
+            setBody(kotlinx.serialization.json.buildJsonObject {
+                put("refresh_token", JsonPrimitive(refreshToken))
+            })
+        }
+        if (response.status.value != 200) throw apiException(response.status.value, response.bodyAsText())
+    }
 
     override suspend fun login(email: String, password: String): AuthTokens {
         val response = request("/auth/login", email, password)
@@ -48,12 +70,13 @@ class AuthRepositoryImpl(
         if (response.status.value !in 200..299) {
             throw apiException(response.status.value, response.bodyAsText())
         }
+        response.body<RegisteredUser>()
     }
 
     private suspend fun request(path: String, email: String, password: String) =
         client.post("$baseUrl$path") {
             contentType(ContentType.Application.Json)
-            setBody(AuthRequest(email = email, password = password))
+            setBody(AuthRequest(email = email.trim().lowercase(), password = password))
         }
 
     private fun apiException(statusCode: Int, body: String) = AuthApiException(

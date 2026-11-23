@@ -1,10 +1,17 @@
 <resources>
+    <string name="nav_events">Events</string>
+    <string name="nav_profile">Profile</string>
+    <string name="profile_guest">Log in to manage your tickets and orders.</string>
+    <string name="profile_signed_in">You are logged in.</string>
+    <string name="session_restoring">Restoring session…</string>
+    <string name="session_storage_error">Couldn't read or save the session. Your login may not survive an app restart.</string>
     <string name="brand_name">BiletFlow</string>
+    <string name="auth_logout">Log out</string>
 
     <string name="auth_login_title">Login</string>
     <string name="auth_login_subtitle">Tickets and orders are linked to your email.</string>
     <string name="auth_registration_title">Registration</string>
-    <string name="auth_registration_subtitle">After registration, confirm your email — otherwise tickets will not arrive.</string>
+    <string name="auth_registration_subtitle">Create an account, then log in to continue.</string>
 
     <string name="auth_email_label">Email</string>
     <string name="auth_password_label">Password</string>
@@ -12,7 +19,7 @@
     <string name="auth_email_placeholder">name@example.kz</string>
     <string name="auth_password_placeholder">••••••••</string>
     <string name="auth_name_placeholder">Will be shown on the ticket</string>
-    <string name="auth_password_registration_placeholder">Minimum 8 characters</string>
+    <string name="auth_password_registration_placeholder">Minimum 6 characters</string>
     <string name="auth_confirm_password_label">Confirm password</string>
     <string name="auth_confirm_password_placeholder">Repeat your password</string>
 
@@ -29,7 +36,10 @@
     <string name="auth_error_email_required">Enter your email.</string>
     <string name="auth_error_email_invalid">Enter a valid email.</string>
     <string name="auth_error_password_required">Enter your password.</string>
-    <string name="auth_error_password_short">Password must contain at least 8 characters.</string>
+    <string name="auth_error_password_short">Password must contain at least 6 characters.</string>
+    <string name="auth_account_created">Account created. Please log in.</string>
+    <string name="auth_error_existing_email">This email is already registered.</string>
+    <string name="auth_error_fields">Check your email and password. The server rejected these fields.</string>
     <string name="auth_error_password_mismatch">Passwords do not match.</string>
     <string name="auth_close">Close</string>
     <string name="auth_error_invalid_credentials">Wrong email or password.</string>
@@ -156,6 +166,14 @@
     <string name="order_status_cancelled">Cancelled</string>
     <string name="order_status_refunded">Refunded</string>
     <string name="order_result_back_to_orders">Back to my orders</string>
+    <string name="order_cancel_action">Cancel order</string>
+    <string name="order_cancel_dialog_title">Cancel this order?</string>
+    <string name="order_cancel_dialog_message">The order will be cancelled. This action can't be undone.</string>
+    <string name="order_cancel_confirm">Cancel order</string>
+    <string name="order_cancel_keep">Keep order</string>
+    <string name="order_result_cancelled">Order cancelled</string>
+    <string name="order_cancel_error_unknown">The server response wasn't received. Don't cancel or pay again until you check the order status.</string>
+    <string name="order_cancel_error_server">Couldn't cancel the order. Please try again.</string>
     <string name="ticket_standard">Standard</string>
     <string name="ticket_standard_price">4,000 ₸</string>
     <string name="ticket_standard_old_price">5,000 ₸</string>

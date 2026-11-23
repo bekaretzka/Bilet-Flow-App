@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 
 enum class TicketQrError { NotFound, Unauthorized, Network }
 
@@ -61,6 +62,7 @@ class TicketQrViewModel(
     }
 
     fun reset() {
+        viewModelScope.coroutineContext.cancelChildren()
         _state.value = TicketQrUiState()
     }
 }

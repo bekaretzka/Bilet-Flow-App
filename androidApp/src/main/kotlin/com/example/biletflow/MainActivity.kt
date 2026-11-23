@@ -11,9 +11,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        var backAction: (() -> Unit)? = null
+        val backCallback = object : androidx.activity.OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() { backAction?.invoke() }
+        }
+        onBackPressedDispatcher.addCallback(this, backCallback)
 
         setContent {
-            App(useMockEvents = BuildConfig.DEBUG)
+            App(useMockEvents = BuildConfig.DEBUG, sessionStorage = androidx.compose.runtime.remember {
+                AndroidSessionStorage(applicationContext, if (BuildConfig.DEBUG) "mock" else "api")
+            }, registerBack = { action ->
+                backAction = action
+                backCallback.isEnabled = action != null
+            })
         }
     }
 }

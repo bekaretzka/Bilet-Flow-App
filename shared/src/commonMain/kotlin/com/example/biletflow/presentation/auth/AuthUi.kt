@@ -58,6 +58,11 @@ fun LoginPage(
     onLoginSuccess: () -> Unit,
     onOpenRegistration: (() -> Unit)? = null,
 ) {
+    val page by viewModel.page.collectAsState()
+    if (page == AuthPage.Registration) {
+        RegistrationPage(viewModel, viewModel::openLogin)
+        return
+    }
     val state by viewModel.state.collectAsState()
     val form by viewModel.form.collectAsState()
     LaunchedEffect(state.isSuccess) {
@@ -94,9 +99,9 @@ fun LoginPage(
             enabled = !state.isLoading,
             onClick = viewModel::login,
         )
-        onOpenRegistration?.let { openRegistration ->
+        (onOpenRegistration ?: viewModel::openRegistration).let { openRegistration ->
             Spacer(Modifier.height(14.dp))
-            TextButton(onClick = openRegistration, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = openRegistration, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(Res.string.auth_no_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
             }
         }
@@ -114,12 +119,8 @@ fun RegistrationPage(viewModel: AuthViewModel, onOpenLogin: () -> Unit) {
             title = stringResource(Res.string.auth_registration_title),
             subtitle = stringResource(Res.string.auth_registration_subtitle),
         )
-        FormLabel(stringResource(Res.string.auth_name_label))
-        FormField(form.name, viewModel::updateName, stringResource(Res.string.auth_name_placeholder))
-        Spacer(Modifier.height(12.dp))
         FormLabel(stringResource(Res.string.auth_email_label))
         FormField(form.email, viewModel::updateEmail, stringResource(Res.string.auth_email_placeholder))
-        Text(stringResource(Res.string.auth_email_confirmation_hint), color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
         Spacer(Modifier.height(12.dp))
         FormLabel(stringResource(Res.string.auth_password_label))
         FormField(form.password, viewModel::updatePassword, stringResource(Res.string.auth_password_registration_placeholder), password = true)
@@ -143,7 +144,7 @@ fun RegistrationPage(viewModel: AuthViewModel, onOpenLogin: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(4.dp))
-        TextButton(onClick = onOpenLogin, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = onOpenLogin, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(Res.string.auth_have_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -251,6 +252,9 @@ private fun AuthFeedback(state: AuthUiState) {
             text = when (error) {
                 AuthRequestError.InvalidCredentials -> stringResource(Res.string.auth_error_invalid_credentials)
                 AuthRequestError.Network -> stringResource(Res.string.auth_error_network)
+                AuthRequestError.ExistingEmail -> stringResource(Res.string.auth_error_existing_email)
+                AuthRequestError.Fields -> stringResource(Res.string.auth_error_fields)
+                AuthRequestError.Server -> stringResource(Res.string.auth_request_failed)
             },
             color = Error,
             fontSize = 11.sp,
@@ -266,6 +270,9 @@ private fun AuthFeedback(state: AuthUiState) {
             lineHeight = 15.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+    if (state.accountCreated) {
+        Text(stringResource(Res.string.auth_account_created), color = Purple, modifier = Modifier.padding(top = 8.dp))
     }
     if (state.isSuccess) {
         Text(

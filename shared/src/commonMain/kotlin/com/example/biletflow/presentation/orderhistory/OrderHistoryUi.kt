@@ -39,6 +39,8 @@ fun OrderHistoryPage(
     eventNames: Map<Int, String>,
     onBack: () -> Unit,
     onLogin: () -> Unit,
+    onLogout: () -> Unit,
+    isAuthenticated: Boolean,
 ) {
     val state by viewModel.state.collectAsState()
     Column(
@@ -51,6 +53,10 @@ fun OrderHistoryPage(
         ) {
             TextButton(onClick = onBack) { Text("‹", color = Color(0xFF17171B), fontSize = 32.sp) }
             Text("BiletFlow", color = Color(0xFF17171B), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            if (isAuthenticated) {
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onLogout) { Text(stringResource(Res.string.auth_logout)) }
+            }
         }
         Spacer(Modifier.height(18.dp))
         Text(stringResource(Res.string.order_history_title), fontSize = 30.sp, fontWeight = FontWeight.Bold)

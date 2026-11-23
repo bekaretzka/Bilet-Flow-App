@@ -54,6 +54,7 @@ fun EventCatalogPage(
     viewModel: EventsViewModel,
     onOpenEvent: (Int) -> Unit,
     onOpenOrders: () -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
 ) {
     val state by viewModel.state.collectAsState()
     val visibleEvents = filterEvents(state.events, state.query, state.category)
@@ -66,7 +67,7 @@ fun EventCatalogPage(
 
     Column(
         modifier = Modifier.fillMaxSize().background(PageBackground)
-            .statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+            .statusBarsPadding().verticalScroll(scrollState).padding(horizontal = 24.dp),
     ) {
         CatalogHeader(onOpenOrders)
         Spacer(Modifier.height(22.dp))

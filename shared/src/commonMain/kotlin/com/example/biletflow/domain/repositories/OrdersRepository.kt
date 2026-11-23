@@ -13,6 +13,8 @@ interface OrdersRepository {
 
     suspend fun payOrder(orderId: Int, accessToken: String): Order
 
+    suspend fun cancelOrder(orderId: Int, accessToken: String): Order
+
     suspend fun getOrder(orderId: Int, accessToken: String): Order
 
     suspend fun getMyOrders(accessToken: String): List<Order>

@@ -18,7 +18,7 @@ enum class AuthValidationError {
     PasswordMismatch,
 }
 
-enum class AuthRequestError { InvalidCredentials, Network }
+enum class AuthRequestError { InvalidCredentials, Network, ExistingEmail, Fields, Server }
 
 data class AuthFormState(
     val email: String = "",
@@ -30,6 +30,7 @@ data class AuthFormState(
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false,
+    val accountCreated: Boolean = false,
     val requestError: AuthRequestError? = null,
     val validationError: AuthValidationError? = null,
 )
@@ -46,11 +47,13 @@ class AuthViewModel(
     val page: StateFlow<AuthPage> = _page.asStateFlow()
 
     fun updateEmail(value: String) {
+        if (_state.value.isLoading) return
         _form.value = _form.value.copy(email = value)
         clearRequestState()
     }
 
     fun updatePassword(value: String) {
+        if (_state.value.isLoading) return
         _form.value = _form.value.copy(password = value)
         clearRequestState()
     }
@@ -61,19 +64,21 @@ class AuthViewModel(
     }
 
     fun updateConfirmPassword(value: String) {
+        if (_state.value.isLoading) return
         _form.value = _form.value.copy(confirmPassword = value)
         clearRequestState()
     }
 
     fun login() {
+        if (_state.value.isLoading) return
         validateLogin()?.let { setValidationError(it); return }
         val form = _form.value
         if (_state.value.isLoading) return
+        _state.value = AuthUiState(isLoading = true)
         viewModelScope.launch {
-            _state.value = AuthUiState(isLoading = true)
             runCatching { repository.login(form.email.trim().lowercase(), form.password) }
                 .onSuccess { tokens ->
-                    sessionStore.save(tokens)
+                    sessionStore.save(tokens.copy(email = form.email.trim().lowercase()))
                     _form.value = _form.value.copy(password = "")
                     _state.value = AuthUiState(isSuccess = true)
                 }
@@ -89,18 +94,40 @@ class AuthViewModel(
         }
     }
 
+
     fun register() {
+        if (_state.value.isLoading) return
         validateRegistration()?.let { setValidationError(it); return }
         val form = _form.value
-        submit { repository.register(form.email.trim(), form.password) }
+        _state.value = AuthUiState(isLoading = true)
+        viewModelScope.launch {
+            try {
+                repository.register(form.email.trim().lowercase(), form.password)
+                _form.value = form.copy(email = form.email.trim().lowercase(), password = "", confirmPassword = "")
+                _page.value = AuthPage.Login
+                _state.value = AuthUiState(accountCreated = true)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _state.value = AuthUiState(requestError = when ((error as? AuthApiException)?.statusCode) {
+                    409 -> AuthRequestError.ExistingEmail
+                    400, 422 -> AuthRequestError.Fields
+                    null -> AuthRequestError.Network
+                    else -> AuthRequestError.Server
+                })
+            }
+        }
     }
 
     fun openRegistration() {
+        if (_state.value.isLoading) return
+        _form.value = _form.value.copy(password = "", confirmPassword = "")
         _page.value = AuthPage.Registration
         clearRequestState()
     }
 
     fun openLogin() {
+        if (_state.value.isLoading) return
+        _form.value = _form.value.copy(password = "", confirmPassword = "")
         _page.value = AuthPage.Login
         clearRequestState()
     }
@@ -111,9 +138,23 @@ class AuthViewModel(
 
     fun closeLoginFlow() {
         if (_state.value.isLoading) return
-        _form.value = _form.value.copy(password = "")
+        _form.value = _form.value.copy(password = "", confirmPassword = "")
         _state.value = AuthUiState()
         _page.value = AuthPage.Login
+    }
+
+    fun logout() {
+        val refreshToken = sessionStore.tokens.value?.refreshToken ?: return
+        sessionStore.clear()
+        _form.value = AuthFormState()
+        _state.value = AuthUiState()
+        _page.value = AuthPage.Login
+        viewModelScope.launch {
+            try { repository.logout(refreshToken) }
+            catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+            }
+        }
     }
 
     private fun clearRequestState() {
@@ -144,7 +185,7 @@ class AuthViewModel(
         if (form.email.isBlank()) return AuthValidationError.EmptyEmail
         if (!form.email.contains("@") || !form.email.contains(".")) return AuthValidationError.InvalidEmail
         if (form.password.isBlank()) return AuthValidationError.EmptyPassword
-        if (form.password.length < 8) return AuthValidationError.ShortPassword
+        if (form.password.length < 6) return AuthValidationError.ShortPassword
         return null
     }
 
