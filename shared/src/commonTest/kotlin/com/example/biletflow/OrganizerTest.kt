@@ -26,6 +26,7 @@ class OrganizerTest {
         val events = MyEventsViewModel(client,requests,session,"http://test")
         val create = CreateEventViewModel(client, requests, session, "http://test")
         val tickets = com.example.biletflow.presentation.organizer.CreateTicketTypeViewModel(client, requests, session, "http://test")
+        val visitor = com.example.biletflow.presentation.eventdetails.EventDetailsViewModel(EventsRepositoryImpl(client,"http://test"))
         try {
             runCurrent()
             vm.load(); vm.state.first { !it.loading }; assertTrue(vm.state.value.absent)
@@ -114,6 +115,23 @@ class OrganizerTest {
             tickets.save(); tickets.state.first { !it.saving }
             assertTrue(tickets.state.value.belowSold)
             tickets.close()
+            visitor.load(101)
+            visitor.state.first { !it.areTicketsLoading && it.ticketTypes.isNotEmpty() }
+            visitor.incrementTicket(1001)
+            assertEquals(1,visitor.state.value.selectedQuantities[1001])
+            val visible = publicEvents.getTicketTypes(101).first { it.id == 1001 }
+            tickets.setHidden(visible,true)
+            tickets.state.first { 1001 !in it.hiding }
+            assertTrue(tickets.list(101).first { it.id == 1001 }.isHidden)
+            assertFalse(publicEvents.getTicketTypes(101).any { it.id == 1001 })
+            tickets.load(101); tickets.state.first { !it.listLoading }
+            assertTrue(tickets.list(101).first { it.id == 1001 }.isHidden)
+            visitor.loadTicketTypes(101)
+            visitor.state.first { !it.areTicketsLoading }
+            assertNull(visitor.state.value.selectedQuantities[1001])
+            tickets.setHidden(tickets.list(101).first { it.id == 1001 },false)
+            tickets.state.first { 1001 !in it.hiding }
+            assertTrue(publicEvents.getTicketTypes(101).any { it.id == 1001 && !it.isHidden })
             events.changeStatus(false); events.state.first { !it.changingStatus }
             assertFalse(publicEvents.getEvents().any { it.id == draft.id })
             events.reload(); events.state.first { !it.loading }
@@ -129,6 +147,14 @@ class OrganizerTest {
             events.reload(); events.state.first { !it.loading }
             assertFalse(events.state.value.statusUnknown)
             assertEquals("published",events.state.value.events.first { it.id == draft.id }.status)
+            events.backToList(); events.state.first { !it.loading }
+            events.select(draft.id); events.state.first { !it.loading }
+            events.cancelEvent(); events.cancelEvent(); events.state.first { !it.changingStatus }
+            assertTrue(events.state.value.statusUnknown)
+            events.reload(); events.state.first { !it.loading }
+            assertEquals("cancelled", events.state.value.events.first { it.id == draft.id }.status)
+            assertFalse(publicEvents.getEvents().any { it.id == draft.id })
+            assertFailsWith<EventsApiException> { publicEvents.getEvent(draft.id) }
             events.backToList(); events.state.first { !it.loading }
             tickets.open(published.id)
             assertTrue(tickets.state.value.added[published.id].isNullOrEmpty())
@@ -160,6 +186,9 @@ class OrganizerTest {
             events.reload(); events.state.first { !it.loading }
             assertFalse(events.state.value.error)
             assertTrue(events.state.value.events.isEmpty())
-        } finally { tickets.viewModelScope.cancel(); create.viewModelScope.cancel(); events.viewModelScope.cancel(); vm.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain() }
+            events.select(draft.id); events.state.first { !it.loading }
+            events.cancelEvent(); events.state.first { !it.changingStatus }
+            assertTrue(events.state.value.accessDenied)
+        } finally { visitor.viewModelScope.cancel(); tickets.viewModelScope.cancel(); create.viewModelScope.cancel(); events.viewModelScope.cancel(); vm.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain() }
     }
 }

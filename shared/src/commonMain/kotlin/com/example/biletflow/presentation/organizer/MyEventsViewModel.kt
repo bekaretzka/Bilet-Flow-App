@@ -45,7 +45,9 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
         mutable.value = mutable.value.copy(events = mutable.value.events.filterNot { it.id == event.id } + event)
     }
     fun catalogRefreshed() { mutable.value = mutable.value.copy(catalogDirty = false) }
-    fun changeStatus(publish: Boolean) {
+    fun changeStatus(publish: Boolean) = changeStatus(if(publish) "publish" else "unpublish")
+    fun cancelEvent() = changeStatus("cancel")
+    private fun changeStatus(action: String) {
         val current = mutable.value
         val id = current.selectedId ?: return
         if (current.loading || current.changingStatus || current.statusUnknown) return
@@ -55,7 +57,7 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
         viewModelScope.launch {
             try {
                 val event = requests.request { token ->
-                    val response = client.patch("$baseUrl/events/$id/${if (publish) "publish" else "unpublish"}") { bearerAuth(token) }
+                    val response = client.patch("$baseUrl/events/$id/$action") { bearerAuth(token) }
                     if (response.status.value == 200) response.body<Event>() else {
                         val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
                         val code = body?.get("error")?.jsonPrimitive?.content

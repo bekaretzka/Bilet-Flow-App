@@ -15,7 +15,23 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 @Serializable
-data class OrganizerProfile(val id: Int, @kotlinx.serialization.SerialName("user_id") val userId: Int, val status: String)
+data class OrganizerProfile(
+    val id: Int,
+    @kotlinx.serialization.SerialName("user_id") val userId: Int,
+    val status: String,
+    @kotlinx.serialization.SerialName("legal_name") val legalName: String? = null,
+    @kotlinx.serialization.SerialName("contact_phone") val contactPhone: String? = null,
+    @kotlinx.serialization.SerialName("identity_verified_at") val identityVerifiedAt: String? = null,
+    @kotlinx.serialization.SerialName("payout_account") val payoutAccount: OrganizerPayoutAccount? = null,
+)
+
+@Serializable
+data class OrganizerPayoutAccount(
+    @kotlinx.serialization.SerialName("holder_name") val holderName: String,
+    @kotlinx.serialization.SerialName("bank_name") val bankName: String,
+    @kotlinx.serialization.SerialName("iban_last4") val ibanLast4: String,
+    @kotlinx.serialization.SerialName("is_simulated") val isSimulated: Boolean,
+)
 data class OrganizerState(val loading: Boolean = false, val profile: OrganizerProfile? = null,
     val absent: Boolean = false, val error: Boolean = false, val unauthorized: Boolean = false,
     val form: Boolean = false)

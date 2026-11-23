@@ -30,7 +30,8 @@ data class TicketTypeFormState(val eventId: Int? = null, val open: Boolean = fal
     val saving: Boolean = false, val failed: Boolean = false, val unknown: Boolean = false,
     val added: Map<Int,List<TicketType>> = emptyMap(), val editing: TicketType? = null,
     val original: Map<String,String> = emptyMap(), val loaded: Map<Int,List<TicketType>> = emptyMap(),
-    val listLoading: Boolean = false, val listError: Boolean = false, val belowSold: Boolean = false)
+    val listLoading: Boolean = false, val listError: Boolean = false, val belowSold: Boolean = false,
+    val hiding: Set<Int> = emptySet(), val hideUnknown: Set<Int> = emptySet(), val hideErrors: Set<Int> = emptySet())
 
 fun validateTicketType(values: Map<String,String>): Set<String> = buildSet {
     if (values["name"].isNullOrBlank()) add("name")
@@ -54,6 +55,31 @@ class CreateTicketTypeViewModel(private val client: HttpClient, private val requ
     private var generation = session.generation
     private var sequence = 0
     private var listSequence = 0
+    fun setHidden(ticket: TicketType, hidden: Boolean) {
+        val state = mutable.value
+        if (ticket.id in state.hiding || ticket.id in state.hideUnknown || state.saving) return
+        val expected = session.generation
+        mutable.value = state.copy(hiding = state.hiding + ticket.id, hideErrors = state.hideErrors - ticket.id)
+        viewModelScope.launch {
+            try {
+                val result = requests.request { token ->
+                    val response = client.patch("$baseUrl/ticket_types/${ticket.id}/${if(hidden) "hide" else "unhide"}") { bearerAuth(token) }
+                    if(response.status.value != 200) throw OrdersApiException(response.status.value,null,"Ticket visibility failed")
+                    response.body<TicketType>()
+                }
+                if(expected != session.generation) return@launch
+                require(result.id == ticket.id && result.eventId == ticket.eventId)
+                val current = mutable.value
+                mutable.value = current.copy(hiding = current.hiding - ticket.id,
+                    added = current.added + (ticket.eventId to (current.added[ticket.eventId].orEmpty().filterNot { it.id == ticket.id } + result)))
+            } catch(error: Exception) {
+                if(error is CancellationException) throw error
+                if(expected == session.generation) mutable.value = mutable.value.copy(hiding = mutable.value.hiding - ticket.id,
+                    hideErrors = mutable.value.hideErrors + ticket.id,
+                    hideUnknown = if(error is OrdersApiException) mutable.value.hideUnknown else mutable.value.hideUnknown + ticket.id)
+            }
+        }
+    }
     fun checkEdited() {
         val current = mutable.value
         val ticket = current.editing ?: return
@@ -90,7 +116,11 @@ class CreateTicketTypeViewModel(private val client: HttpClient, private val requ
                     response.body<List<TicketType>>()
                 }
                 if (expected == session.generation && requestId == listSequence) mutable.value = mutable.value.copy(
-                    listLoading = false, loaded = mutable.value.loaded + (eventId to result))
+                    listLoading = false, loaded = mutable.value.loaded + (eventId to result),
+                    hideUnknown = mutable.value.hideUnknown - result.map { it.id }.toSet(),
+                    added = mutable.value.added + (eventId to mutable.value.added[eventId].orEmpty().map { saved ->
+                        if(saved.id in mutable.value.hideUnknown) result.firstOrNull { it.id == saved.id } ?: saved else saved
+                    }))
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected == session.generation && requestId == listSequence) mutable.value = mutable.value.copy(listLoading = false,listError = true)
@@ -98,6 +128,7 @@ class CreateTicketTypeViewModel(private val client: HttpClient, private val requ
         }
     }
     fun edit(ticket: TicketType) {
+        if(ticket.id in mutable.value.hiding || ticket.id in mutable.value.hideUnknown) return
         val values = mapOf("name" to ticket.name,"description" to ticket.description.orEmpty(),"price" to ticket.price.toString(),
             "quantity" to ticket.quantity.toString(),"max_per_order" to ticket.maxPerOrder.toString(),
             "sales_start" to ticket.salesStart,"sales_end" to ticket.salesEnd)
@@ -152,7 +183,7 @@ class CreateTicketTypeViewModel(private val client: HttpClient, private val requ
                 if (expected == session.generation && requestId == sequence) {
                     require(ticket.eventId == id)
                     mutable.value = mutable.value.copy(saving = false, open = false, values = emptyMap(),
-                        added = current.added + (id to (current.added[id].orEmpty().filterNot { it.id == ticket.id } + ticket)))
+                        added = mutable.value.added + (id to (mutable.value.added[id].orEmpty().filterNot { it.id == ticket.id } + ticket)))
                 }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error

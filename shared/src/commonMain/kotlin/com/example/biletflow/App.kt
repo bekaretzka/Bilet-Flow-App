@@ -116,6 +116,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         val organizerState by organizerVm.state.collectAsState()
         val myEventsVm: MyEventsViewModel = viewModel { MyEventsViewModel(apiClient, ordersRepository, sessionStore) }
         val myEventsState by myEventsVm.state.collectAsState()
+        val paidSalesVm: PaidSalesViewModel = viewModel { PaidSalesViewModel(apiClient,ordersRepository,sessionStore) }
+        val paidSalesState by paidSalesVm.state.collectAsState()
+        LaunchedEffect(paidSalesState.denied) {
+            if(paidSalesState.denied) { paidSalesVm.close(); myEventsVm.close(); organizerVm.load() }
+        }
         LaunchedEffect(selectedTab, selectedEventId, myEventsState.open, myEventsState.catalogDirty) {
             if (selectedTab == 0 && selectedEventId == null && !myEventsState.open && myEventsState.catalogDirty) {
                 eventsViewModel.reload(); myEventsVm.catalogRefreshed()
@@ -183,6 +188,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
         val isRoot = !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
+            paidSalesState.eventId != null && !showLogin -> ({ paidSalesVm.back() })
             ticketCreateState.open && !showLogin -> ({ ticketCreateVm.close() })
             createEventState.open && !showLogin -> ({ createEventVm.close() })
             myEventsState.selectedId != null && !showLogin -> ({ myEventsVm.backToList() })
@@ -227,11 +233,12 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
+            paidSalesState.eventId != null && !showLogin -> PaidSalesPage(paidSalesVm)
             ticketCreateState.open && !showLogin -> CreateTicketTypePage(ticketCreateVm)
             createEventState.open && !showLogin -> CreateEventPage(createEventVm) {
                 createEventVm.reset(); myEventsVm.reload()
             }
-            myEventsState.selectedId != null && !showLogin -> EventManagementPage(myEventsVm, createEventVm::edit, ticketCreateVm)
+            myEventsState.selectedId != null && !showLogin -> EventManagementPage(myEventsVm, createEventVm::edit, ticketCreateVm) { paidSalesVm.open(it.id,it.title) }
             myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open)
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(

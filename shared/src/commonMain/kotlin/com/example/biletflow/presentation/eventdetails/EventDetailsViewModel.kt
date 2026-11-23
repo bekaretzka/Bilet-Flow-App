@@ -61,7 +61,20 @@ class EventDetailsViewModel(
 
     fun ensureLoaded(eventId: Int) {
         val state = _state.value
-        if (state.eventId == eventId && state.event != null) { loadTicketTypes(eventId); return }
+        if (state.eventId == eventId && state.event != null) {
+            loadTicketTypes(eventId)
+            viewModelScope.launch {
+                try {
+                    val event = repository.getEvent(eventId)
+                    if (_state.value.eventId == eventId) _state.value = _state.value.copy(event = event)
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    if (_state.value.eventId == eventId && error is EventsApiException && error.statusCode == 404)
+                        _state.value = EventDetailsUiState(eventId = eventId, error = EventDetailsError.NotFound)
+                }
+            }
+            return
+        }
         load(eventId)
     }
 

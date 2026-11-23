@@ -33,6 +33,7 @@ fun createMockEventsHttpClient(): HttpClient {
     var nextEventId = 500
     val organizerReads = mutableMapOf<String, Int>()
     val myEventReads = mutableMapOf<String, Int>()
+    val paidSalesReads = mutableMapOf<Int, Int>()
     val consumedRefreshTokens = mutableSetOf<String>()
     val accessAliases = mutableMapOf<String, String>()
     val refreshOwners = mutableMapOf(
@@ -73,6 +74,107 @@ fun createMockEventsHttpClient(): HttpClient {
         val rawAuthorization = request.headers[HttpHeaders.Authorization]
         val authorizationHeader = accessAliases[rawAuthorization] ?: rawAuthorization
         when {
+            (request.method == HttpMethod.Post && path == "/organizers/me/verification") ||
+                (request.method == HttpMethod.Put && path == "/organizers/me/payout-account") -> {
+                val owner = authorizationHeader
+                val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
+                when {
+                    owner == null || owner == "Bearer expired-access" -> respondJson("""{"detail":"Unauthorized"}""", HttpStatusCode.Unauthorized)
+                    profile == null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found","fields":null}""", HttpStatusCode.NotFound)
+                    profile["status"]?.jsonPrimitive?.content != "approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Organizer not approved","fields":null}""", HttpStatusCode.Forbidden)
+                    else -> {
+                        val input = Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject
+                        fun value(key: String) = input[key]?.jsonPrimitive?.content.orEmpty().trim()
+                        val verify = path.endsWith("/verification")
+                        val marker = value(if (verify) "legal_name" else "holder_name")
+                        val errors = buildJsonObject {
+                            val nameKey = if (verify) "legal_name" else "holder_name"
+                            if (value(nameKey).length !in 2..200) put(nameKey, "Enter 2–200 characters")
+                            if (!verify && value("bank_name").length !in 2..100) put("bank_name", "Enter 2–100 characters")
+                            val key = if (verify) "contact_phone" else "iban"
+                            if (value(key).isBlank() || value(key) == "field-error") put(key, "Invalid test value")
+                        }
+                        if (errors.isNotEmpty()) respondJson(buildJsonObject {
+                            put("error", "ValidationError"); put("message", "Invalid fields"); put("fields", errors)
+                        }.toString(), HttpStatusCode.UnprocessableEntity)
+                        else {
+                            if (marker == "network-error") throw IOException("Mock organizer connection unavailable")
+                            val updated = buildJsonObject {
+                                profile.forEach { (key, value) -> put(key, value) }
+                                if (verify) {
+                                    put("legal_name", value("legal_name")); put("contact_phone", value("contact_phone"))
+                                    put("identity_verified_at", "2026-11-23T10:00:00+05:00")
+                                } else putJsonObject("payout_account") {
+                                    put("holder_name", value("holder_name")); put("bank_name", value("bank_name"))
+                                    put("iban_last4", value("iban").filterNot { it.isWhitespace() }.takeLast(4))
+                                    put("is_simulated", true)
+                                }
+                            }
+                            organizerProfiles[owner!!] = updated.toString()
+                            if (marker == "unknown-result") throw IOException("Mock response lost after save")
+                            respondJson(updated.toString(), HttpStatusCode.OK)
+                        }
+                    }
+                }
+            }
+            request.method == HttpMethod.Get && path.matches(Regex("/events/\\d+/paid-sales")) -> {
+                val owner = authorizationHeader
+                val id = path.removePrefix("/events/").substringBefore('/').toInt()
+                val event = createdEvents[owner].orEmpty().firstOrNull { it["id"]?.jsonPrimitive?.int == id }
+                val owned = event != null || (owner == "Bearer mock-access-token" && id in 101..103)
+                val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
+                when {
+                    owner == null || owner == "Bearer expired-access" -> respondJson("""{"detail":"Unauthorized"}""", HttpStatusCode.Unauthorized)
+                    !owned -> respondJson("""{"error":"EventAccessDeniedError","message":"Not event owner","fields":null}""", HttpStatusCode.Forbidden)
+                    profile?.get("status")?.jsonPrimitive?.content != "approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Organizer not approved","fields":null}""", HttpStatusCode.Forbidden)
+                    event?.get("title")?.jsonPrimitive?.content == "paid-sales-missing" -> respondJson("""{"error":"PaidSalesNotFoundError","message":"Activation record not found","fields":null}""", HttpStatusCode.NotFound)
+                    id == 101 && paidSalesReads.getOrPut(id) { 0 } == 0 -> {
+                        paidSalesReads[id] = 1
+                        respondJson("""{"detail":"Temporary unavailable"}""", HttpStatusCode.ServiceUnavailable)
+                    }
+                    else -> {
+                        // Seeded events: 101 none, 102 partial, 103 active.
+                        // Created events start with unmet requirements; title paid-sales-suspended simulates suspension.
+                        val status = when {
+                            event?.get("title")?.jsonPrimitive?.content == "paid-sales-suspended" -> "suspended"
+                            id == 102 -> "pending"
+                            id == 103 -> "active"
+                            else -> "not_started"
+                        }
+                        val complete = status in listOf("active", "suspended")
+                        respondJson(buildJsonObject {
+                            put("event_id", id); put("status", status)
+                            put("fee_amount", 5000); put("currency", "KZT"); put("is_simulated", true)
+                            putJsonObject("checklist") {
+                                put("has_paid_ticket_type", complete || status == "pending" || id == 101 ||
+                                    createdTicketTypes[owner].orEmpty().any {
+                                        it["event_id"]?.jsonPrimitive?.int == id && (it["price"]?.jsonPrimitive?.int ?: 0) > 0
+                                    })
+                                put("identity_verified", complete || status == "pending" || profile?.get("identity_verified_at")?.let { it != JsonNull } == true)
+                                put("payout_account_connected", complete || profile?.get("payout_account")?.let { it != JsonNull } == true)
+                                put("terms_accepted", complete); put("fee_paid", complete)
+                            }
+                            put("can_activate", false)
+                            put("activated_at", if (complete) JsonPrimitive("2026-11-12T10:00:00+05:00") else JsonNull)
+                            put("suspended_at", if (status == "suspended") JsonPrimitive("2026-11-13T10:00:00+05:00") else JsonNull)
+                            put("suspension_reason", if (status == "suspended") JsonPrimitive("Mock review required") else JsonNull)
+                        }.toString(), HttpStatusCode.OK)
+                    }
+                }
+            }
+            request.method == HttpMethod.Patch && path.matches(Regex("/ticket_types/\\d+/(hide|unhide)")) -> {
+                val owner = authorizationHeader
+                val id = path.removePrefix("/ticket_types/").substringBefore('/').toInt()
+                val original = createdTicketTypes[owner].orEmpty().firstOrNull { it["id"]?.jsonPrimitive?.int == id }
+                    ?: if(owner == "Bearer mock-access-token") (Json.parseToJsonElement(MOCK_EVENT_101_TICKET_TYPES_JSON).jsonArray + Json.parseToJsonElement(MOCK_EVENT_102_TICKET_TYPES_JSON).jsonArray).firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.int == id }?.jsonObject else null
+                if(original == null) respondJson("""{"error":"EventAccessDeniedError","message":"Access denied","fields":null}""",HttpStatusCode.Forbidden)
+                else {
+                    val updated = buildJsonObject { original.forEach { (k,v) -> put(k,v) }; put("is_hidden",path.endsWith("/hide")) }
+                    val list = createdTicketTypes.getOrPut(owner!!) { mutableListOf() }
+                    list.removeAll { it["id"]?.jsonPrimitive?.int == id }; list.add(updated)
+                    respondJson(updated.toString(),HttpStatusCode.OK)
+                }
+            }
             request.method == HttpMethod.Patch && path.matches(Regex("/ticket-types/\\d+")) -> {
                 val owner = authorizationHeader
                 val id = path.substringAfterLast('/').toInt()
@@ -91,22 +193,37 @@ fun createMockEventsHttpClient(): HttpClient {
                     }
                 }
             }
-            request.method == HttpMethod.Patch && path.matches(Regex("/events/\\d+/(publish|unpublish)")) -> {
+            request.method == HttpMethod.Patch && path.matches(Regex("/events/\\d+/(publish|unpublish|cancel)")) -> {
                 val owner = authorizationHeader
                 val id = path.removePrefix("/events/").substringBefore('/').toInt()
                 val original = createdEvents[owner].orEmpty().firstOrNull { it["id"]?.jsonPrimitive?.int == id }
                 val publish = path.endsWith("/publish")
+                val cancel = path.endsWith("/cancel")
                 when {
                     original == null -> respondJson("""{"error":"EventAccessDeniedError","message":"Access denied","fields":null}""",HttpStatusCode.Forbidden)
-                    original["status"]?.jsonPrimitive?.content != (if (publish) "draft" else "published") -> respondJson("""{"error":"InvalidEventStatusError","message":"Event status changed","fields":null}""",HttpStatusCode.Conflict)
+                    (if(cancel) original["status"]?.jsonPrimitive?.content !in listOf("draft","published") else original["status"]?.jsonPrimitive?.content != (if (publish) "draft" else "published")) -> respondJson("""{"error":"InvalidEventStatusError","message":"Event status changed","fields":null}""",HttpStatusCode.Conflict)
                     publish && (original["venue_name"]?.jsonPrimitive?.content.isNullOrBlank() || original["venue_address"]?.jsonPrimitive?.content.isNullOrBlank()) -> respondJson("""{"error":"EventNotReadyToPublishError","message":"Venue and address are required","fields":{"venue_name":"required","venue_address":"required"}}""",HttpStatusCode.BadRequest)
                     else -> {
                         val updated = buildJsonObject {
                             original.forEach { (k,v) -> put(k,v) }
-                            put("status",if(publish) "published" else "draft")
+                            put("status",if(cancel) "cancelled" else if(publish) "published" else "draft")
                         }
                         createdEvents[owner]?.removeAll { it["id"]?.jsonPrimitive?.int == id }
                         createdEvents[owner]?.add(updated)
+                        if(cancel) mockOrders.toMap().forEach { (orderId,json) ->
+                            val order = Json.parseToJsonElement(json).jsonObject
+                            if(order["event_id"]?.jsonPrimitive?.int == id && order["status"]?.jsonPrimitive?.content in listOf("pending","confirmed")) {
+                                val refunded = order["paid_at"] != null && order["paid_at"] != JsonNull
+                                mockOrders[orderId] = buildJsonObject {
+                                    order.forEach { (k,v) -> put(k,v) }
+                                    put("status",if(refunded) "refunded" else "cancelled")
+                                    put(if(refunded) "refunded_at" else "cancelled_at","2026-11-23T10:00:00+05:00")
+                                    put("tickets",buildJsonArray { order["tickets"]?.jsonArray.orEmpty().forEach { ticket ->
+                                        add(buildJsonObject { ticket.jsonObject.forEach { (k,v) -> put(k,v) }; put("status",if(refunded) "refunded" else "cancelled") })
+                                    } })
+                                }.toString()
+                            }
+                        }
                         if (original["title"]?.jsonPrimitive?.content == "status-offline") throw IOException("Mock response lost after status change")
                         respondJson(updated.toString(),HttpStatusCode.OK)
                     }
@@ -220,7 +337,7 @@ fun createMockEventsHttpClient(): HttpClient {
                 } else if (request.method == HttpMethod.Post && path == "/organizers/apply") {
                     if (organizerProfiles.containsKey(owner)) respondJson("""{"error":"OrganizerProfileAlreadyExistsError","message":"Profile exists","fields":null}""", HttpStatusCode.Conflict)
                     else {
-                        val profile = """{"id":31,"user_id":100,"status":"pending"}"""
+                        val profile = """{"id":${31 + organizerProfiles.size},"user_id":${100 + organizerProfiles.size},"status":"pending"}"""
                         organizerProfiles[owner] = profile
                         organizerReads[owner] = 0
                         respondJson(profile, HttpStatusCode.OK)
@@ -233,7 +350,10 @@ fun createMockEventsHttpClient(): HttpClient {
                         organizerProfiles[owner] == null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found","fields":null}""", HttpStatusCode.NotFound)
                         reads == 1 -> respondJson("""{"detail":"Temporarily unavailable"}""", HttpStatusCode.InternalServerError)
                         else -> {
-                            if (reads >= 3) organizerProfiles[owner] = """{"id":31,"user_id":100,"status":"approved"}"""
+                            if (reads >= 3) organizerProfiles[owner] = buildJsonObject {
+                                Json.parseToJsonElement(organizerProfiles.getValue(owner)).jsonObject.forEach { (key, value) -> put(key, value) }
+                                put("status", "approved")
+                            }.toString()
                             respondJson(organizerProfiles.getValue(owner), HttpStatusCode.OK)
                         }
                     }
