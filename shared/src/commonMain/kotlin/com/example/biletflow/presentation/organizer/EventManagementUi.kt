@@ -13,7 +13,7 @@ import com.example.biletflow.domain.models.Event
 import com.example.biletflow.presentation.events.formatEventDate
 
 @Composable
-fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}) {
+fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}, onAttendees: (Event) -> Unit = {}, onStaff: (Event) -> Unit = {}) {
     val state by vm.state.collectAsState()
     val ticketState by tickets.state.collectAsState()
     val event = state.events.firstOrNull { it.id == state.selectedId }
@@ -38,6 +38,8 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                 Text(event.status)
                 Text(event.visibility)
                 Button(onClick = { onPaidSales(event) }) { Text(stringResource(Res.string.paid_sales_title)) }
+                Button(onClick = { onAttendees(event) }) { Text(stringResource(Res.string.attendees_title)) }
+                Button(onClick = { onStaff(event) }) { Text(stringResource(Res.string.staff_title)) }
                 listOfNotNull(event.description, event.category, event.venueName, event.venueAddress,
                     event.capacity?.toString(), event.registrationOpensAt, event.registrationClosesAt, event.refundPolicy)
                     .forEach { Text(it) }

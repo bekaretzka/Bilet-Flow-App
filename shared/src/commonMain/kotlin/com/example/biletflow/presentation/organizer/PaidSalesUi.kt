@@ -34,6 +34,24 @@ data class PaidSalesStatus(
     @SerialName("suspended_at") val suspendedAt: String? = null,
     @SerialName("suspension_reason") val suspensionReason: String? = null,
 )
+@Serializable
+data class ActivationFeePayment(
+    val id: Int, val purpose: String, val amount: Long, val currency: String, val status: String,
+    val provider: String,
+    @SerialName("provider_reference") val providerReference: String,
+    @SerialName("is_simulated") val isSimulated: Boolean,
+    @SerialName("created_at") val createdAt: String,
+)
+
+internal fun PaidSalesStatus.allows(action: String): Boolean {
+    if (status !in listOf("not_started", "pending")) return false
+    return when (action) {
+        "accept-terms" -> checklist["terms_accepted"] == false
+        "pay-fee" -> checklist["fee_paid"] == false
+        "activate" -> canActivate
+        else -> false
+    }
+}
 data class PaidSalesState(val eventId: Int? = null,val title: String = "",val loading: Boolean = false,
     val data: PaidSalesStatus? = null,val error: Boolean = false,val missing: Boolean = false,val denied: Boolean = false,
     val requirement: String? = null,
@@ -43,6 +61,10 @@ data class PaidSalesState(val eventId: Int? = null,val title: String = "",val lo
     val unknownResult: Boolean = false,
     val formError: Boolean = false,
     val observedProfile: OrganizerProfile? = null,
+    val confirmation: String? = null,
+    val activationBusy: Boolean = false,
+    val activationUnknown: Boolean = false,
+    val activationError: String? = null,
 )
 
 class PaidSalesViewModel(private val client: HttpClient,private val requests: SessionOrdersRepository,
@@ -57,7 +79,8 @@ class PaidSalesViewModel(private val client: HttpClient,private val requests: Se
     fun open(id: Int,title: String) { sequence++; unresolvedRequirement = null; mutable.value = PaidSalesState(eventId = id,title = title); reload() }
     fun close() { sequence++; unresolvedRequirement = null; mutable.value = PaidSalesState() }
     fun back() {
-        if (mutable.value.submitting) return
+        if (mutable.value.submitting || mutable.value.activationBusy) return
+        if (mutable.value.confirmation != null) { dismissAction(); return }
         if (mutable.value.requirement == null) close()
         else {
             // Keep an unresolved operation and its input until checked, even if the form is reopened.
@@ -67,9 +90,55 @@ class PaidSalesViewModel(private val client: HttpClient,private val requests: Se
     }
     private var unresolvedRequirement: String? = null
     fun openRequirement(key: String) {
-        if (mutable.value.loading || mutable.value.submitting || mutable.value.eventId == null) return
+        if (mutable.value.loading || mutable.value.submitting || mutable.value.activationBusy || mutable.value.activationUnknown || mutable.value.eventId == null) return
         if (key !in listOf("identity_verified", "payout_account_connected")) return
         mutable.value = mutable.value.copy(requirement = unresolvedRequirement ?: key, formError = false)
+    }
+    fun askAction(action: String) {
+        val current = mutable.value
+        if (current.loading || current.submitting || current.activationBusy || current.activationUnknown || current.unknownResult || current.requirement != null) return
+        if (current.data?.allows(action) == true) mutable.value = current.copy(confirmation = action)
+    }
+    fun dismissAction() { mutable.value = mutable.value.copy(confirmation = null) }
+    fun confirmAction() {
+        val current = mutable.value
+        val action = current.confirmation ?: return
+        val id = current.eventId ?: return
+        if (current.activationBusy || current.activationUnknown || current.loading || current.submitting || current.data?.allows(action) != true) return
+        val expected = session.generation
+        val requestId = ++sequence
+        mutable.value = current.copy(confirmation = null, activationBusy = true, activationError = null)
+        viewModelScope.launch {
+            try {
+                requests.request { token ->
+                    val response = client.post("$baseUrl/events/$id/paid-sales/$action") {
+                        bearerAuth(token)
+                        if (action == "pay-fee") {
+                            contentType(ContentType.Application.Json)
+                            setBody(JsonObject(emptyMap()))
+                        }
+                    }
+                    if (response.status.value != 200) {
+                        val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+                        throw OrdersApiException(response.status.value, body?.get("error")?.jsonPrimitive?.contentOrNull, "Paid sales action failed")
+                    }
+                    if (action == "pay-fee") response.body<ActivationFeePayment>()
+                    else require(response.body<PaidSalesStatus>().eventId == id)
+                }
+                if (expected != session.generation || requestId != sequence) return@launch
+                mutable.value = mutable.value.copy(activationBusy = false)
+                reload()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                if (expected != session.generation || requestId != sequence) return@launch
+                val api = error as? OrdersApiException
+                val unknown = api == null || api.statusCode >= 500 && api.errorCode != "RefreshUnavailable"
+                mutable.value = mutable.value.copy(activationBusy = false, activationUnknown = unknown,
+                    activationError = api?.errorCode ?: "unknown",
+                    denied = api?.statusCode == 403 || api?.errorCode in listOf("OrganizerNotFoundError", "OrganizerNotApprovedError"))
+                if (api?.statusCode == 409 || api?.statusCode == 402) reload()
+            }
+        }
     }
     fun updateField(key: String, value: String) {
         if (mutable.value.submitting || mutable.value.unknownResult) return
@@ -141,10 +210,10 @@ class PaidSalesViewModel(private val client: HttpClient,private val requests: Se
     fun reload() {
         val current = mutable.value
         val id = current.eventId ?: return
-        if(current.loading) return
+        if(current.loading || current.activationBusy || current.submitting) return
         val requestId = ++sequence
         val expected = session.generation
-        mutable.value = current.copy(loading = true, data = null, error = false, missing = false, denied = false)
+        mutable.value = current.copy(loading = true, data = null, error = false, missing = false, denied = false, confirmation = null)
         viewModelScope.launch {
             try {
                 val data = requests.request { token ->
@@ -155,7 +224,9 @@ class PaidSalesViewModel(private val client: HttpClient,private val requests: Se
                     }
                 }
                 require(data.eventId == id)
-                if(expected == session.generation && requestId == sequence) mutable.value = mutable.value.copy(loading = false,data = data)
+                if(expected == session.generation && requestId == sequence) mutable.value = mutable.value.copy(
+                    loading = false, data = data, activationUnknown = false,
+                    activationError = if (current.activationUnknown) null else current.activationError)
             } catch(error: Exception) {
                 if(error is CancellationException) throw error
                 if(expected != session.generation || requestId != sequence) return@launch
@@ -176,10 +247,21 @@ fun PaidSalesPage(vm: PaidSalesViewModel) {
         return
     }
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TextButton(onClick = vm::close) { Text(stringResource(Res.string.ticket_create_back)) }
+        TextButton(onClick = vm::back, enabled = !state.activationBusy) { Text(stringResource(Res.string.ticket_create_back)) }
         Text(stringResource(Res.string.paid_sales_title),style = MaterialTheme.typography.headlineLarge)
         Text(state.title)
-        TextButton(onClick = vm::reload,enabled = !state.loading) { Text(stringResource(Res.string.my_events_refresh)) }
+        TextButton(onClick = vm::reload,enabled = !state.loading && !state.activationBusy) { Text(stringResource(if (state.activationUnknown) Res.string.payment_check_status else Res.string.my_events_refresh)) }
+        if (state.activationBusy) CircularProgressIndicator()
+        if (state.activationUnknown) Text(stringResource(Res.string.paid_action_unknown))
+        else state.activationError?.let { code ->
+            Text(stringResource(when (code) {
+                "PaymentFailedError" -> Res.string.paid_fee_declined
+                "ActivationFeeAlreadyPaidError" -> Res.string.paid_fee_already_paid
+                "ActivationRequirementsNotMetError" -> Res.string.paid_requirements_unmet
+                "InvalidActivationStatusError" -> Res.string.paid_invalid_status
+                else -> Res.string.paid_action_error
+            }), color = MaterialTheme.colorScheme.error)
+        }
         when {
             state.loading -> CircularProgressIndicator()
             state.error -> {
@@ -209,14 +291,40 @@ fun PaidSalesPage(vm: PaidSalesViewModel) {
                     }
                     Text("$label — ${stringResource(if(complete) Res.string.paid_done else Res.string.paid_required)}")
                     if (!complete && key in listOf("identity_verified", "payout_account_connected")) {
-                        TextButton(onClick = { vm.openRequirement(key) }) { Text(label) }
+                        TextButton(onClick = { vm.openRequirement(key) }, enabled = !state.activationBusy && !state.activationUnknown) { Text(label) }
                     }
                 }
                 Text(stringResource(if(data.canActivate) Res.string.paid_can_activate else Res.string.paid_cannot_activate))
                 data.activatedAt?.let { Text("${stringResource(Res.string.paid_activated_at)}: $it") }
                 data.suspendedAt?.let { Text("${stringResource(Res.string.paid_suspended_at)}: $it") }
                 data.suspensionReason?.let { Text(it) }
+                listOf("accept-terms", "pay-fee", "activate").filter { data.allows(it) }.forEach { action ->
+                    Button(onClick = { vm.askAction(action) }, enabled = !state.activationBusy && !state.activationUnknown) {
+                        Text(stringResource(paidActionLabel(action)))
+                    }
+                }
             }
         }
     }
+    state.confirmation?.let { action ->
+        AlertDialog(
+            onDismissRequest = vm::dismissAction,
+            title = { Text(stringResource(paidActionLabel(action))) },
+            text = {
+                Text(when (action) {
+                    "accept-terms" -> stringResource(Res.string.paid_terms_simulation)
+                    "pay-fee" -> "${stringResource(Res.string.paid_fee_confirm)} ${state.data?.feeAmount} ${state.data?.currency}"
+                    else -> stringResource(Res.string.paid_activate_confirm)
+                })
+            },
+            confirmButton = { TextButton(onClick = vm::confirmAction) { Text(stringResource(paidActionLabel(action))) } },
+            dismissButton = { TextButton(onClick = vm::dismissAction) { Text(stringResource(Res.string.auth_close)) } },
+        )
+    }
+}
+
+private fun paidActionLabel(action: String) = when (action) {
+    "accept-terms" -> Res.string.paid_terms
+    "pay-fee" -> Res.string.paid_pay_fee
+    else -> Res.string.paid_activate
 }

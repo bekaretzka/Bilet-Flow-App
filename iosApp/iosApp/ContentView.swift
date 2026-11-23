@@ -4,6 +4,7 @@ import Shared
 
 struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Self.Context) -> UIViewController {
+        TicketCameraController.installBridge()
         #if DEBUG
         return MainViewControllerKt.MainViewController(useMockEvents: true)
         #else
