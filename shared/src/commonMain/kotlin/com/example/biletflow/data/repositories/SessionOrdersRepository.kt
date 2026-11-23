@@ -52,7 +52,7 @@ class SessionOrdersRepository(
         }
     }
 
-    private suspend fun <T> request(call: suspend (String) -> T): T {
+    suspend fun <T> request(call: suspend (String) -> T): T {
         mutex.withLock {
             if (flight?.isCompleted == true) flight = null
         }

@@ -61,7 +61,7 @@ class EventDetailsViewModel(
 
     fun ensureLoaded(eventId: Int) {
         val state = _state.value
-        if (state.eventId == eventId && state.event != null) return
+        if (state.eventId == eventId && state.event != null) { loadTicketTypes(eventId); return }
         load(eventId)
     }
 
