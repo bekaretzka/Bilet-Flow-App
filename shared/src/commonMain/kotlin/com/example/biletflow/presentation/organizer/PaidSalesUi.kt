@@ -52,6 +52,10 @@ internal fun PaidSalesStatus.allows(action: String): Boolean {
         else -> false
     }
 }
+
+// Readiness describes a future activation, never an already active or suspended sale.
+internal fun PaidSalesStatus.activationReadiness(): Boolean? =
+    canActivate.takeIf { status in listOf("not_started", "pending") }
 data class PaidSalesState(val eventId: Int? = null,val title: String = "",val loading: Boolean = false,
     val data: PaidSalesStatus? = null,val error: Boolean = false,val missing: Boolean = false,val denied: Boolean = false,
     val requirement: String? = null,
@@ -294,7 +298,9 @@ fun PaidSalesPage(vm: PaidSalesViewModel) {
                         TextButton(onClick = { vm.openRequirement(key) }, enabled = !state.activationBusy && !state.activationUnknown) { Text(label) }
                     }
                 }
-                Text(stringResource(if(data.canActivate) Res.string.paid_can_activate else Res.string.paid_cannot_activate))
+                data.activationReadiness()?.let { ready ->
+                    Text(stringResource(if(ready) Res.string.paid_can_activate else Res.string.paid_cannot_activate))
+                }
                 data.activatedAt?.let { Text("${stringResource(Res.string.paid_activated_at)}: $it") }
                 data.suspendedAt?.let { Text("${stringResource(Res.string.paid_suspended_at)}: $it") }
                 data.suspensionReason?.let { Text(it) }

@@ -61,7 +61,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         val catalogScroll = rememberScrollState()
 
         val apiClient = remember(useMockEvents) {
-            if (useMockEvents) createMockEventsHttpClient() else createHttpClient()
+            if (useMockEvents) createMockEventsHttpClient(visitorCheckoutReady = true) else createHttpClient()
         }
         val eventsRepository = remember(apiClient) { EventsRepositoryImpl(client = apiClient) }
         val authRepository = remember(apiClient) { AuthRepositoryImpl(client = apiClient) }
@@ -461,11 +461,6 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                             showOrderHistory = index == 1
                             if (index == 1 && session != null) orderHistoryViewModel.open()
                             else orderHistoryViewModel.close()
-                            if (index == 1 && session == null) {
-                                loginForHistory = true
-                                authViewModel.closeLoginFlow()
-                                showLogin = true
-                            }
                         }
                     },
                     icon = { Text(listOf("▦", "▤", "○")[index], modifier = Modifier) },
