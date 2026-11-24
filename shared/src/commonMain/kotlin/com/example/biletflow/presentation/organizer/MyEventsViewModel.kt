@@ -44,6 +44,12 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
     fun updated(event: Event) {
         mutable.value = mutable.value.copy(events = mutable.value.events.filterNot { it.id == event.id } + event)
     }
+    fun openCreated(event: Event) {
+        mutable.value = mutable.value.copy(open = true, selectedId = event.id, filter = null,
+            events = mutable.value.events.filterNot { it.id == event.id } + event,
+            statusError = null, statusSuccess = false, statusUnknown = false)
+        reload()
+    }
     fun catalogRefreshed() { mutable.value = mutable.value.copy(catalogDirty = false) }
     fun changeStatus(publish: Boolean) = changeStatus(if(publish) "publish" else "unpublish")
     fun cancelEvent() = changeStatus("cancel")

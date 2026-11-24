@@ -391,4 +391,22 @@
     <string name="camera_settings">Открыть настройки</string>
     <string name="camera_missing">Камера недоступна. Используйте ручной поиск билета.</string>
     <string name="camera_error">Не удалось запустить камеру. Повторите попытку или используйте ручной поиск.</string>
+    <string name="sales_title">Продажи</string>
+    <string name="sales_error">Не удалось загрузить продажи. Попробуйте снова.</string>
+    <string name="sales_simulated">Учебная симуляция: денежные показатели являются тестовыми.</string>
+    <string name="sales_paid_orders">Оплаченные заказы</string>
+    <string name="sales_gross">Валовая сумма продаж</string>
+    <string name="sales_fees">Комиссии за обработку</string>
+    <string name="sales_refunds">Возвраты</string>
+    <string name="sales_payout">Ожидаемая выплата</string>
+    <string name="sales_types">По типам билетов</string>
+    <string name="sales_types_empty">Типов билетов пока нет.</string>
+    <string name="sales_price">Цена</string>
+    <string name="sales_quantity">Количество</string>
+    <string name="sales_sold">Продано</string>
+    <string name="sales_reserved">В резерве</string>
+    <string name="sales_available">Доступно</string>
+    <string name="refund_contract_gap">Полный возврат из списка пока недоступен: API передаёт номер заказа, но не предоставляет организатору статус и сумму заказа. Статус билета и цена типа не определяют возможность и сумму возврата.</string>
+    <string name="event_copy">Создать копию</string>
+    <string name="event_copy_info">Копируются только настройки мероприятия. Выберите заново даты мероприятия и сроки регистрации. После сохранения черновика добавьте типы билетов отдельно. Заказы, билеты посетителей, сотрудники и активация платных продаж остаются у исходного события.</string>
 </resources>

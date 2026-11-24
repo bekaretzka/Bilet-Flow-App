@@ -122,6 +122,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         val attendeesState by attendeesVm.state.collectAsState()
         val staffVm: EventStaffViewModel = viewModel { EventStaffViewModel(apiClient, ordersRepository, sessionStore) }
         val staffState by staffVm.state.collectAsState()
+        val salesVm: EventSalesViewModel = viewModel { EventSalesViewModel(apiClient, ordersRepository, sessionStore) }
+        val salesState by salesVm.state.collectAsState()
+        LaunchedEffect(salesState.denied) {
+            if (salesState.denied) { salesVm.close(); myEventsVm.close(); organizerVm.load() }
+        }
         val staffEventsVm: StaffEventsViewModel = viewModel { StaffEventsViewModel(apiClient, ordersRepository, sessionStore) }
         val staffEventsState by staffEventsVm.state.collectAsState()
         val checkInVm: CheckInOverviewViewModel = viewModel { CheckInOverviewViewModel(apiClient, ordersRepository, sessionStore) }
@@ -150,7 +155,10 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         LaunchedEffect(createEventState.created?.id, createEventState.denied) {
             if (createEventState.denied) { createEventVm.reset(); myEventsVm.close(); organizerVm.load() }
             else if (createEventState.created != null) {
-                if (createEventState.editingId != null) {
+                if (createEventState.copyingFromId != null) {
+                    myEventsVm.openCreated(requireNotNull(createEventState.created))
+                    createEventVm.reset()
+                } else if (createEventState.editingId != null) {
                     myEventsVm.updated(requireNotNull(createEventState.created))
                     createEventVm.reset()
                 } else { createEventVm.reset(); myEventsVm.filter(null); myEventsVm.reload() }
@@ -207,6 +215,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
         val isRoot = !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
+            salesState.eventId != null && !showLogin -> ({ salesVm.close() })
             checkInState.scannerOpen && !showLogin -> ({ checkInVm.closeScanner() })
             checkInState.event != null && !showLogin -> ({ checkInVm.close() })
             staffEventsState.open && !showLogin -> ({ staffEventsVm.close() })
@@ -257,6 +266,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
+            salesState.eventId != null && !showLogin -> EventSalesPage(salesVm)
             checkInState.scannerOpen && !showLogin -> QrScannerPage(checkInVm)
             checkInState.event != null && !showLogin -> CheckInOverviewPage(checkInVm, checkInVm::close)
             staffEventsState.open && !showLogin -> StaffEventsPage(staffEventsVm, checkInVm::open)
@@ -265,11 +275,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             paidSalesState.eventId != null && !showLogin -> PaidSalesPage(paidSalesVm)
             ticketCreateState.open && !showLogin -> CreateTicketTypePage(ticketCreateVm)
             createEventState.open && !showLogin -> CreateEventPage(createEventVm) {
-                createEventVm.reset(); myEventsVm.reload()
+                createEventVm.reset(); myEventsVm.backToList()
             }
             myEventsState.selectedId != null && !showLogin -> EventManagementPage(myEventsVm, createEventVm::edit, ticketCreateVm,
                 onPaidSales = { paidSalesVm.open(it.id, it.title) }, onAttendees = { attendeesVm.open(it.id, it.title) },
-                onStaff = { staffVm.open(it.id, it.title) })
+                onStaff = { staffVm.open(it.id, it.title) }, onSales = { salesVm.open(it.id, it.title) }, onCopy = createEventVm::copySettings)
             myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open)
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(

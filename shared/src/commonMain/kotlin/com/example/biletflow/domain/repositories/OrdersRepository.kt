@@ -14,6 +14,7 @@ interface OrdersRepository {
     suspend fun payOrder(orderId: Int, accessToken: String): Order
 
     suspend fun cancelOrder(orderId: Int, accessToken: String): Order
+    suspend fun refundOrder(orderId: Int, reason: String, accessToken: String): Order
 
     suspend fun getOrder(orderId: Int, accessToken: String): Order
 

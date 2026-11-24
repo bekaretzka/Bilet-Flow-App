@@ -391,4 +391,22 @@
     <string name="camera_settings">Open settings</string>
     <string name="camera_missing">No camera is available. Use manual ticket search.</string>
     <string name="camera_error">Could not start the camera. Retry or use manual search.</string>
+    <string name="sales_title">Sales</string>
+    <string name="sales_error">Could not load sales. Please try again.</string>
+    <string name="sales_simulated">Educational simulation: these monetary amounts are test data.</string>
+    <string name="sales_paid_orders">Paid orders</string>
+    <string name="sales_gross">Gross sales</string>
+    <string name="sales_fees">Processing fees</string>
+    <string name="sales_refunds">Refunds</string>
+    <string name="sales_payout">Estimated payout</string>
+    <string name="sales_types">By ticket type</string>
+    <string name="sales_types_empty">No ticket types.</string>
+    <string name="sales_price">Price</string>
+    <string name="sales_quantity">Quantity</string>
+    <string name="sales_sold">Sold</string>
+    <string name="sales_reserved">Reserved</string>
+    <string name="sales_available">Available</string>
+    <string name="refund_contract_gap">Full refunds are not available from this list yet: the API provides an order number, but no order status or amount accessible to the organizer. Do not use ticket status or ticket price to infer refund eligibility.</string>
+    <string name="event_copy">Create copy</string>
+    <string name="event_copy_info">Only event settings are copied. Choose new event and registration dates. After saving the draft, add ticket types separately. Orders, attendee tickets, staff and paid sales activation remain with the original event.</string>
 </resources>

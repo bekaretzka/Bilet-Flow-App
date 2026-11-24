@@ -21,18 +21,21 @@ val eventTextFields = listOf("title", "description", "category", "venue_name", "
 data class CreateEventState(val open: Boolean = false, val values: Map<String,String> = emptyMap(),
     val errors: Map<String,String> = emptyMap(), val saving: Boolean = false,
     val failed: Boolean = false, val unknown: Boolean = false, val denied: Boolean = false,
-    val created: Event? = null, val editingId: Int? = null, val original: Map<String,String> = emptyMap())
+    val created: Event? = null, val editingId: Int? = null, val original: Map<String,String> = emptyMap(),
+    val copyingFromId: Int? = null)
 
 class CreateEventViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
     private val session: SessionStore, private val baseUrl: String = apiBaseUrl) : ViewModel() {
     private val mutable = MutableStateFlow(CreateEventState())
     val state = mutable.asStateFlow()
     private var generation = session.generation
+    private var sequence = 0
     init { viewModelScope.launch { session.tokens.collect {
         if (generation != session.generation) { generation = session.generation; reset() }
     } } }
-    fun open() { mutable.value = CreateEventState(open = true, values = mapOf("visibility" to "public")) }
+    fun open() { sequence++; mutable.value = CreateEventState(open = true, values = mapOf("visibility" to "public")) }
     fun edit(event: Event) {
+        sequence++
         val values = mapOf("title" to event.title, "description" to event.description.orEmpty(),
             "category" to event.category.orEmpty(), "venue_name" to event.venueName.orEmpty(),
             "venue_address" to event.venueAddress.orEmpty(), "capacity" to (event.capacity?.toString() ?: ""),
@@ -42,12 +45,17 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
             "registration_closes_at" to event.registrationClosesAt.orEmpty())
         mutable.value = CreateEventState(open = true, values = values, original = values, editingId = event.id)
     }
-    fun reset() { mutable.value = CreateEventState() }
+    fun copySettings(event: Event) {
+        edit(event)
+        mutable.value = CreateEventState(open = true, values = mutable.value.values - eventDateFields.toSet(), copyingFromId = event.id)
+    }
+    fun reset() { sequence++; mutable.value = CreateEventState() }
     fun close() { if (!mutable.value.saving) reset() }
     fun checkActual() {
         val current = mutable.value
         val id = current.editingId ?: return
         val expected = session.generation
+        val requestId = ++sequence
         mutable.value = current.copy(saving = true)
         viewModelScope.launch {
             try {
@@ -56,14 +64,14 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
                     if (response.status.value != 200) throw OrdersApiException(response.status.value,null,"Check failed")
                     response.body<List<Event>>()
                 }
-                if (expected != session.generation) return@launch
+                if (expected != session.generation || requestId != sequence) return@launch
                 val actual = events.first { it.id == id }
                 edit(actual)
                 val baseline = mutable.value.original
                 mutable.value = mutable.value.copy(values = current.values, original = baseline, unknown = false, failed = false)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
-                if (expected == session.generation) mutable.value = current.copy(saving = false, failed = true)
+                if (expected == session.generation && requestId == sequence) mutable.value = current.copy(saving = false, failed = true)
             }
         }
     }
@@ -78,6 +86,7 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
         val errors = validateEventForm(current.values)
         if (errors.isNotEmpty()) { mutable.value = current.copy(errors = errors); return }
         val expected = session.generation
+        val requestId = ++sequence
         mutable.value = current.copy(saving = true, failed = false, errors = emptyMap())
         val payload = buildJsonObject {
             (eventTextFields + eventDateFields + "visibility").forEach { key ->
@@ -99,15 +108,16 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
                     if (response.status.value == 200) response.body<Event>() else {
                         val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
                         val fields = parseEventFieldErrors(body)
-                        if (fields.isNotEmpty() && expected == session.generation)
+                        if (fields.isNotEmpty() && expected == session.generation && requestId == sequence)
                             mutable.value = mutable.value.copy(errors = fields)
                         throw OrdersApiException(response.status.value, body?.get("error")?.jsonPrimitive?.content, "Create event failed")
                     }
                 }
-                if (expected == session.generation) mutable.value = mutable.value.copy(saving = false, open = false, created = event)
+                if (current.copyingFromId != null) require(event.id != current.copyingFromId && event.status == "draft")
+                if (expected == session.generation && requestId == sequence) mutable.value = mutable.value.copy(saving = false, open = false, created = event)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
-                if (expected != session.generation) return@launch
+                if (expected != session.generation || requestId != sequence) return@launch
                 val api = error as? OrdersApiException
                 mutable.value = mutable.value.copy(saving = false, failed = true, unknown = api == null,
                     denied = api?.errorCode in listOf("OrganizerNotFoundError", "OrganizerNotApprovedError"))

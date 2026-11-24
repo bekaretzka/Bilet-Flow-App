@@ -22,7 +22,12 @@ fun CreateEventPage(vm: CreateEventViewModel, onCheckList: () -> Unit) {
         "registration_closes_at" to Res.string.create_closes)
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = vm::close, enabled = !state.saving) { Text(stringResource(Res.string.create_back)) }
-        Text(stringResource(if (state.editingId == null) Res.string.create_event else Res.string.event_edit), style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(when {
+            state.copyingFromId != null -> Res.string.event_copy
+            state.editingId == null -> Res.string.create_event
+            else -> Res.string.event_edit
+        }), style = MaterialTheme.typography.headlineLarge)
+        if (state.copyingFromId != null) Text(stringResource(Res.string.event_copy_info))
         Text(stringResource(Res.string.event_offsets))
         (listOf("title") + eventDateFields.take(2) + eventTextFields.drop(1) + eventDateFields.drop(2)).forEach { key ->
             val error = state.errors[key]

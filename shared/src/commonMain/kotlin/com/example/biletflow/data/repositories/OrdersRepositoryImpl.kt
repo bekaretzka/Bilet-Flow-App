@@ -73,6 +73,18 @@ class OrdersRepositoryImpl(
         return response.asOrderOrThrow(expectedStatus = 200)
     }
 
+    /** Organizer-only operation. Never use the buyer GET to obtain another buyer's order. */
+    override suspend fun refundOrder(orderId: Int, reason: String, accessToken: String): Order {
+        val normalized = reason.trim()
+        require(normalized.length in 3..500) { "Refund reason must contain 3–500 characters" }
+        val response = client.post("$baseUrl/orders/$orderId/refund") {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(kotlinx.serialization.json.buildJsonObject { put("reason", kotlinx.serialization.json.JsonPrimitive(normalized)) })
+        }
+        return response.asOrderOrThrow(expectedStatus = 200)
+    }
+
     override suspend fun getMyOrders(accessToken: String): List<Order> {
         val response = client.get("$baseUrl/orders/me") {
             bearerAuth(accessToken)
