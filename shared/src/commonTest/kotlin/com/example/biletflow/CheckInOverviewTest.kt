@@ -24,8 +24,10 @@ class CheckInOverviewTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val client = createMockEventsHttpClient()
         val searches = mutableListOf<String>()
+        var checkInPosts = 0
         client.plugin(HttpSend).intercept { request ->
             if (request.url.build().encodedPath.endsWith("/check-in/search")) searches.add(request.url.build().parameters["q"].orEmpty())
+            if (request.method == HttpMethod.Post && request.url.build().encodedPath.endsWith("/check-in")) checkInPosts++
             execute(request)
         }
         val auth = AuthRepositoryImpl(client, "http://test")
@@ -70,8 +72,18 @@ class CheckInOverviewTest {
             assertEquals(CheckInStats(3, 0, 1, 2, 0), vm.state.value.stats)
             vm.query("A+B & Тест"); vm.search(); vm.state.first { !it.searching }
             assertTrue(vm.state.value.tickets.all { it.status == "cancelled" })
+            vm.openScanner(); vm.scannerForeground(true)
+            assertTrue(vm.state.value.scannerOpen)
+            val revokedScannerEpoch = vm.state.value.scannerEpoch
             assertEquals(204, client.delete("http://test/events/101/staff/101") { bearerAuth("mock-access-token") }.status.value)
             vm.reloadStats(); vm.state.first { !it.loadingStats }; assertTrue(vm.state.value.denied)
+            assertFalse(vm.state.value.scannerOpen)
+            assertNull(vm.state.value.stats)
+            assertTrue(vm.state.value.tickets.isEmpty())
+            // A camera frame already queued on the main thread must not submit after revocation.
+            vm.scannerFrame(revokedScannerEpoch, listOf(order.tickets.first().code))
+            runCurrent()
+            assertEquals(0, checkInPosts)
             vm.close(); assertNull(vm.state.value.event)
             vm.open(event.copy(id = 102, title = "Other event")); vm.state.first { !it.loadingStats }
             assertTrue(vm.state.value.denied); assertTrue(vm.state.value.tickets.isEmpty()); assertNull(vm.state.value.stats)

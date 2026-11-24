@@ -14,6 +14,7 @@ import kotlinx.datetime.Instant
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -26,6 +27,10 @@ import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 // The app enables a ready-to-buy concert; activation tests keep the incomplete checklist fixtures.
 fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false): HttpClient {
@@ -55,6 +60,9 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false): HttpClien
         else -> registeredUsers.keys.elementAt(owner!!.removePrefix("Bearer mock-user-").toInt())
     }
     val orderOwners = mutableMapOf(7101 to "Bearer mock-access-token", 7102 to "Bearer mock-access-token", 7103 to "Bearer mock-access-token")
+    val supportEntries = mutableMapOf<Pair<String, String>, Pair<JsonObject, String>>()
+    val supportMutex = Mutex()
+    var nextSupportId = 9000
     var event104TicketAttempts = 0
     val mockOrders = mutableMapOf<Int, String>()
     val paymentAttempts = mutableMapOf<Int, Int>()
@@ -157,6 +165,186 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false): HttpClien
         val rawAuthorization = request.headers[HttpHeaders.Authorization]
         val authorizationHeader = accessAliases[rawAuthorization] ?: rawAuthorization
         when {
+            request.method == HttpMethod.Get && (path == "/support/requests/me" || path.matches(Regex("/support/requests/\\d+(?:/messages)?"))) -> supportMutex.withLock {
+                val owner = authorizationHeader.orEmpty()
+                val id = path.split('/').getOrNull(3)?.toIntOrNull()
+                val messages = path.endsWith("/messages")
+                val records = supportEntries.filterKeys { it.first == owner }.values.map { Json.parseToJsonElement(it.second).jsonObject }
+                val found = records.firstOrNull { it["id"]?.jsonPrimitive?.int == id }
+                val rawLimit = request.url.parameters["limit"]
+                val limit = rawLimit?.toIntOrNull() ?: if(rawLimit == null) 50 else 0
+                val cursor = request.url.parameters["cursor"]
+                val prefix = if(messages) "support-$id-before-" else "support-before-"
+                val before = cursor?.removePrefix(prefix)?.toIntOrNull()?.takeIf { cursor.startsWith(prefix) }
+                fun enrich(record: JsonObject) = buildJsonObject {
+                    record.forEach { (key,value) -> put(key,value) }
+                    put("updated_at",record.getValue("created_at"))
+                    val eventId = record.getValue("event_id").jsonPrimitive.int
+                    val event = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == eventId }
+                        ?: mockEvents.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.int == eventId }?.jsonObject
+                    put("event_title",event?.get("title") ?: JsonNull)
+                }
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
+                    id != null && found == null -> respondJson("""{"error":"SupportRequestNotFoundError","message":"Request not found"}""",HttpStatusCode.NotFound)
+                    limit !in 1..100 || cursor != null && (before == null || before <= 0) -> respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid cursor or limit"}""",HttpStatusCode.UnprocessableEntity)
+                    id != null && !messages -> respondJson(enrich(requireNotNull(found)).toString(),HttpStatusCode.OK)
+                    else -> {
+                        val source = if(messages) listOf(buildJsonObject {
+                            val record = requireNotNull(found)
+                            put("id",record.getValue("id")); put("request_id",record.getValue("id"))
+                            put("author_name",JsonNull); put("author_role","visitor")
+                            put("text",record.getValue("message")); put("created_at",record.getValue("created_at"))
+                        }) else records.map(::enrich)
+                        val remaining = source.sortedByDescending { it.getValue("id").jsonPrimitive.int }
+                            .filter { before == null || it.getValue("id").jsonPrimitive.int < before }
+                        val page = remaining.take(limit)
+                        respondJson(buildJsonObject {
+                            put("items",JsonArray(page))
+                            put("next_cursor",if(remaining.size > limit) JsonPrimitive(prefix + page.last().getValue("id").jsonPrimitive.int) else JsonNull)
+                        }.toString(),HttpStatusCode.OK)
+                    }
+                }
+            }
+            request.method == HttpMethod.Post && path == "/support/requests" -> supportMutex.withLock {
+                val owner = authorizationHeader.orEmpty()
+                val input = runCatching { Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject }.getOrNull()
+                fun value(key: String) = (input?.get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
+                fun number(key: String) = (input?.get(key) as? JsonPrimitive)?.intOrNull
+                val eventId = number("event_id")
+                val orderId = number("order_id")
+                val ticketId = number("ticket_id")
+                val category = value("category"); val subject = value("subject").trim(); val message = value("message").trim()
+                val requestId = value("client_request_id")
+                fun length(text: String) = text.indices.count { it == 0 || !text[it].isLowSurrogate() || !text[it-1].isHighSurrogate() }
+                val errors = buildList {
+                    if (eventId == null || eventId <= 0) add("event_id")
+                    listOf("order_id", "ticket_id").forEach { key ->
+                        if(input?.get(key) != null && input[key] != JsonNull && (number(key) ?: 0) <= 0) add(key)
+                    }
+                    if(category !in listOf("event_question", "ticket_issue", "payment_issue", "other")) add("category")
+                    if(length(subject) !in 3..200) add("subject")
+                    if(length(message) !in 1..5000) add("message")
+                    if(!Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}").matches(requestId)) add("client_request_id")
+                }
+                val canonical = buildJsonObject {
+                    put("event_id", eventId?.let(::JsonPrimitive) ?: JsonNull)
+                    put("order_id", orderId?.let(::JsonPrimitive) ?: JsonNull); put("ticket_id", ticketId?.let(::JsonPrimitive) ?: JsonNull)
+                    put("category",category); put("subject",subject); put("message",message); put("client_request_id",requestId)
+                }
+                val saved = supportEntries[owner to requestId]
+                val event = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == eventId }
+                    ?: mockEvents.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.int == eventId }?.jsonObject
+                val order = orderId?.let { mockOrders[it] }?.let { Json.parseToJsonElement(it).jsonObject }
+                val ticketOrder = ticketId?.let { id -> mockOrders.entries.firstOrNull { (_,json) ->
+                    Json.parseToJsonElement(json).jsonObject["tickets"]?.jsonArray.orEmpty().any { it.jsonObject["id"]?.jsonPrimitive?.int == id }
+                } }
+                val ticketOrderJson = ticketOrder?.value?.let { Json.parseToJsonElement(it).jsonObject }
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
+                    errors.isNotEmpty() -> respondJson(buildJsonObject {
+                        put("error","VALIDATION_ERROR"); put("message","Validation failed")
+                        put("fields",buildJsonObject { errors.forEach { put(it,"Invalid value") } })
+                    }.toString(),HttpStatusCode.UnprocessableEntity)
+                    saved != null && saved.first != canonical -> respondJson("""{"error":"ClientRequestConflictError","message":"Request ID already used with another body","fields":{"client_request_id":"Conflict"}}""",HttpStatusCode.Conflict)
+                    saved != null -> respondJson(saved.second,HttpStatusCode.Created)
+                    event == null || orderId == null && ticketId == null && (event["status"]?.jsonPrimitive?.content != "published" || event["visibility"]?.jsonPrimitive?.content == "private") -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                    orderId != null && (order == null || orderOwners[orderId] != owner || order["event_id"]?.jsonPrimitive?.int != eventId) -> respondJson(MOCK_ORDER_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                    ticketId != null && (ticketOrder == null || orderOwners[ticketOrder.key] != owner || ticketOrderJson?.get("event_id")?.jsonPrimitive?.int != eventId || orderId != null && ticketOrder.key != orderId) -> respondJson(MOCK_TICKET_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                    subject == "support-offline" -> throw IOException("Mock support unavailable")
+                    else -> {
+                        val result = buildJsonObject {
+                            canonical.forEach { (key,value) -> put(key,value) }
+                            put("order_id", (orderId ?: ticketOrder?.key)?.let(::JsonPrimitive) ?: JsonNull)
+                            put("id",nextSupportId++); put("status","open"); put("created_at","2026-11-24T14:00:00+05:00")
+                        }.toString()
+                        supportEntries[owner to requestId] = canonical to result
+                        if(subject == "support-unknown") throw IOException("Mock support response lost after creation")
+                        respondJson(result,HttpStatusCode.Created)
+                    }
+                }
+            }
+            request.method == HttpMethod.Get && path.matches(Regex("/organizer/events/\\d+/orders(?:/\\d+)?")) -> {
+                val owner = authorizationHeader.orEmpty()
+                val parts = path.split('/')
+                val eventId = parts[3].toInt()
+                val orderId = parts.getOrNull(5)?.toInt()
+                val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
+                val exists = mockEvents.any { it.jsonObject["id"]?.jsonPrimitive?.int == eventId } ||
+                    createdEvents.values.flatten().any { it["id"]?.jsonPrimitive?.int == eventId }
+                val limit = request.url.parameters["limit"]?.toIntOrNull() ?: if (request.url.parameters["limit"] == null) 50 else 0
+                val status = request.url.parameters["status"]
+                val cursor = request.url.parameters["cursor"]
+                val prefix = "orders-$eventId-${status ?: "all"}-after-"
+                val afterId = cursor?.removePrefix(prefix)?.toIntOrNull()?.takeIf { cursor.startsWith(prefix) }
+                val all = mockOrders.values.map { Json.parseToJsonElement(it).jsonObject }
+                    .filter { it["event_id"]?.jsonPrimitive?.int == eventId }
+                    .sortedWith(compareByDescending<JsonObject> { Instant.parse(it.getValue("created_at").jsonPrimitive.content) }
+                        .thenByDescending { it.getValue("id").jsonPrimitive.int })
+                val anchor = all.firstOrNull { it["id"]?.jsonPrimitive?.int == afterId }
+                fun projection(order: JsonObject) = buildJsonObject {
+                    listOf("id", "event_id", "status", "total_amount", "buyer_name", "buyer_email", "created_at", "paid_at", "refunded_at")
+                        .forEach { put(it, order[it] ?: JsonNull) }
+                }
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
+                    profile == null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found","fields":null}""", HttpStatusCode.NotFound)
+                    profile["status"]?.jsonPrimitive?.content != "approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Not approved","fields":null}""", HttpStatusCode.Forbidden)
+                    !exists -> respondJson(MOCK_EVENT_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                    ownedEvents(owner).none { it["id"]?.jsonPrimitive?.int == eventId } -> respondJson("""{"error":"EventAccessDeniedError","message":"Not the event owner","fields":null}""", HttpStatusCode.Forbidden)
+                    limit !in 1..100 || status != null && status !in listOf("pending", "confirmed", "cancelled", "refunded", "expired") || cursor != null && anchor == null ->
+                        respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid pagination or status","fields":{"cursor":"Invalid parameters"}}""", HttpStatusCode.UnprocessableEntity)
+                    orderId != null -> all.firstOrNull { it["id"]?.jsonPrimitive?.int == orderId }?.let { respondJson(projection(it).toString(), HttpStatusCode.OK) }
+                        ?: respondJson(MOCK_ORDER_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                    else -> {
+                        val remaining = all.drop(if (anchor == null) 0 else all.indexOf(anchor) + 1)
+                            .filter { status == null || it["status"]?.jsonPrimitive?.content == status }
+                        val page = remaining.take(limit)
+                        respondJson(buildJsonObject {
+                            put("items", buildJsonArray { page.forEach { add(projection(it)) } })
+                            put("next_cursor", if (remaining.size > limit) JsonPrimitive(prefix + page.last().getValue("id").jsonPrimitive.int) else JsonNull)
+                        }.toString(), HttpStatusCode.OK)
+                    }
+                }
+            }
+            request.method == HttpMethod.Get && path.matches(Regex("/organizer/events/\\d+/ticket-types(?:/\\d+)?")) -> {
+                val owner = authorizationHeader.orEmpty()
+                val parts = path.split('/')
+                val eventId = parts[3].toInt()
+                val ticketId = parts.getOrNull(5)?.toInt()
+                val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
+                val exists = mockEvents.any { it.jsonObject["id"]?.jsonPrimitive?.int == eventId } ||
+                    createdEvents.values.flatten().any { it["id"]?.jsonPrimitive?.int == eventId }
+                val limit = request.url.parameters["limit"]?.toIntOrNull() ?: if(request.url.parameters["limit"] == null) 50 else 0
+                val cursor = request.url.parameters["cursor"]
+                val after = if (cursor == null) 0 else cursor.removePrefix("types-$eventId-after-").toIntOrNull()
+                    ?.takeIf { cursor.startsWith("types-$eventId-after-") && it >= 0 }
+                val stored = createdTicketTypes[owner].orEmpty().filter { it["event_id"]?.jsonPrimitive?.int == eventId }
+                val seeded = if(owner == "Bearer mock-access-token") when(eventId) {
+                    101 -> Json.parseToJsonElement(MOCK_EVENT_101_TICKET_TYPES_JSON).jsonArray.map { it.jsonObject }
+                    102 -> Json.parseToJsonElement(MOCK_EVENT_102_TICKET_TYPES_JSON).jsonArray.map { it.jsonObject }
+                    else -> emptyList()
+                } else emptyList()
+                val types = (stored + seeded).distinctBy { it["id"] }.sortedBy { it.getValue("id").jsonPrimitive.int }
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON, HttpStatusCode.Unauthorized)
+                    profile == null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found","fields":null}""", HttpStatusCode.NotFound)
+                    profile["status"]?.jsonPrimitive?.content != "approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Not approved","fields":null}""", HttpStatusCode.Forbidden)
+                    !exists -> respondJson(MOCK_EVENT_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                    ownedEvents(owner).none { it["id"]?.jsonPrimitive?.int == eventId } -> respondJson("""{"error":"EventAccessDeniedError","message":"Not the event owner","fields":null}""", HttpStatusCode.Forbidden)
+                    eventId <= 0 || ticketId != null && ticketId <= 0 || limit !in 1..100 || after == null -> respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid pagination parameters","fields":{"cursor":"Invalid cursor or limit"}}""", HttpStatusCode.UnprocessableEntity)
+                    ticketId != null -> types.firstOrNull { it["id"]?.jsonPrimitive?.int == ticketId }?.let { respondJson(it.toString(), HttpStatusCode.OK) }
+                        ?: respondJson("""{"error":"TicketTypeNotFoundError","message":"Ticket type not found for this event","fields":null}""", HttpStatusCode.NotFound)
+                    else -> {
+                        val remaining = types.filter { it.getValue("id").jsonPrimitive.int > after }
+                        val page = remaining.take(limit)
+                        respondJson(buildJsonObject {
+                            put("items", buildJsonArray { page.forEach { add(it) } })
+                            put("next_cursor", if(remaining.size > limit) JsonPrimitive("types-$eventId-after-${page.last().getValue("id").jsonPrimitive.int}") else JsonNull)
+                        }.toString(), HttpStatusCode.OK)
+                    }
+                }
+            }
             request.method == HttpMethod.Post && path.matches(Regex("/orders/\\d+/refund")) -> {
                 val owner = authorizationHeader.orEmpty()
                 val orderId = path.removePrefix("/orders/").substringBefore('/').toInt()

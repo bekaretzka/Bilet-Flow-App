@@ -54,6 +54,7 @@ fun EventDetailsPage(
     viewModel: EventDetailsViewModel,
     onBack: () -> Unit,
     onContinue: () -> Unit,
+    onSupport: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(eventId) { viewModel.ensureLoaded(eventId) }
@@ -87,6 +88,7 @@ fun EventDetailsPage(
                     if (viewModel.prepareOrderReview(eventId)) onContinue()
                 },
                 modifier = Modifier.weight(1f),
+                onSupport = onSupport,
             )
         }
     }
@@ -100,6 +102,7 @@ private fun EventDetailsContent(
     onDecrementTicket: (Int) -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
+    onSupport: () -> Unit,
 ) {
     val event = requireNotNull(state.event)
     Column(
@@ -119,6 +122,7 @@ private fun EventDetailsContent(
         )
         Spacer(Modifier.height(14.dp))
         Text(event.title, color = Ink, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
+        TextButton(onClick = onSupport) { Text(stringResource(Res.string.support_contact)) }
         Spacer(Modifier.height(22.dp))
         EventInfo(
             icon = "▣",

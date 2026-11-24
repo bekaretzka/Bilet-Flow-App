@@ -13,11 +13,11 @@ import com.example.biletflow.domain.models.Event
 import com.example.biletflow.presentation.events.formatEventDate
 
 @Composable
-fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}, onAttendees: (Event) -> Unit = {}, onStaff: (Event) -> Unit = {}, onSales: (Event) -> Unit = {}, onCopy: (Event) -> Unit = {}) {
+fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}, onAttendees: (Event) -> Unit = {}, onStaff: (Event) -> Unit = {}, onSales: (Event) -> Unit = {}, onCopy: (Event) -> Unit = {}, onOrders: (Event) -> Unit = {}) {
     val state by vm.state.collectAsState()
     val ticketState by tickets.state.collectAsState()
     val event = state.events.firstOrNull { it.id == state.selectedId }
-    LaunchedEffect(event?.id, event?.status) { if(event?.status == "published") tickets.load(event.id) }
+    LaunchedEffect(event?.id, event?.status) { event?.let { tickets.load(it.id) } }
     var confirm by remember(state.selectedId) { mutableStateOf(false) }
     var cancelConfirm by remember(state.selectedId) { mutableStateOf(false) }
     var hideConfirm by remember(state.selectedId) { mutableStateOf<com.example.biletflow.domain.models.TicketType?>(null) }
@@ -41,6 +41,7 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                 Button(onClick = { onAttendees(event) }) { Text(stringResource(Res.string.attendees_title)) }
                 Button(onClick = { onStaff(event) }) { Text(stringResource(Res.string.staff_title)) }
                 Button(onClick = { onSales(event) }) { Text(stringResource(Res.string.sales_title)) }
+                Button(onClick = { onOrders(event) }) { Text(stringResource(Res.string.organizer_orders_title)) }
                 Button(onClick = { onCopy(event) }, enabled = !state.loading && !state.changingStatus) { Text(stringResource(Res.string.event_copy)) }
                 listOfNotNull(event.description, event.category, event.venueName, event.venueAddress,
                     event.capacity?.toString(), event.registrationOpensAt, event.registrationClosesAt, event.refundPolicy)
@@ -70,10 +71,18 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                     else -> Res.string.event_published_private
                 }))
                 if (ticketState.listLoading) CircularProgressIndicator()
-                if (ticketState.listError && event.status == "published") Button(onClick = { tickets.load(event.id) }) { Text(stringResource(Res.string.events_retry)) }
+                Text(stringResource(Res.string.organizer_ticket_list_title))
+                TextButton(onClick = { tickets.load(event.id) }, enabled = !ticketState.listLoading && !ticketState.saving && ticketState.hiding.isEmpty()) {
+                    Text(stringResource(Res.string.my_events_refresh))
+                }
+                if (ticketState.listError) {
+                    Text(stringResource(Res.string.organizer_ticket_list_error), color = MaterialTheme.colorScheme.error)
+                    ticketState.listErrorMessage?.let { Text(it) }
+                    Button(onClick = { tickets.load(event.id) }) { Text(stringResource(Res.string.events_retry)) }
+                }
+                ticketState.verificationErrorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 tickets.list(event.id).let { added ->
-                    Text(stringResource(if(event.status == "published") Res.string.ticket_list_partial else Res.string.ticket_created_session))
-                    Text(stringResource(Res.string.ticket_hidden_limit))
+                    if (!ticketState.listLoading && !ticketState.listError && added.isEmpty()) Text(stringResource(Res.string.organizer_ticket_list_empty))
                     added.forEach { ticket ->
                         val ticketLocked = locked || ticket.id in ticketState.hiding || ticket.id in ticketState.hideUnknown
                         Card(onClick = { tickets.edit(ticket) }, enabled = !ticketLocked, modifier = Modifier.fillMaxWidth()) {
@@ -86,11 +95,11 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                                 Button(onClick = { if(ticket.isHidden) tickets.setHidden(ticket,false) else hideConfirm = ticket }, enabled = !ticketLocked) {
                                     Text(stringResource(if(ticket.isHidden) Res.string.ticket_unhide else Res.string.ticket_hide))
                                 }
-                                if(ticket.id in ticketState.hideErrors) Text(stringResource(if(ticket.id in ticketState.hideUnknown) Res.string.ticket_hide_unknown else Res.string.create_failed))
-                                if(ticket.id in ticketState.hideUnknown && event.status == "published") TextButton(onClick = { tickets.load(event.id) }) {
-                                    Text(stringResource(Res.string.payment_check_status))
-                                }
                             }
+                        }
+                        if(ticket.id in ticketState.hideErrors) Text(stringResource(if(ticket.id in ticketState.hideUnknown) Res.string.organizer_ticket_visibility_unknown else Res.string.create_failed))
+                        if(ticket.id in ticketState.hideUnknown) TextButton(onClick = { tickets.checkHidden(ticket) }, enabled = ticket.id !in ticketState.hiding) {
+                            Text(stringResource(Res.string.payment_check_status))
                         }
                     }
                 }

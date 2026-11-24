@@ -107,7 +107,7 @@ fun AttendeesPage(vm: AttendeesViewModel) {
         TextButton(onClick = vm::close) { Text(stringResource(Res.string.ticket_create_back)) }
         Text(stringResource(Res.string.attendees_title), style = MaterialTheme.typography.headlineLarge)
         Text(state.title)
-        Text(stringResource(Res.string.refund_contract_gap), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(Res.string.organizer_refund_location), style = MaterialTheme.typography.bodySmall)
         TextButton(onClick = vm::reload, enabled = !state.loading) { Text(stringResource(Res.string.my_events_refresh)) }
         OutlinedTextField(value = state.query, onValueChange = vm::search,
             label = { Text(stringResource(Res.string.attendees_search)) }, singleLine = true, modifier = Modifier.fillMaxWidth())

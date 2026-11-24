@@ -55,6 +55,7 @@ fun OrderResultPage(
     onOpenTicket: (Int) -> Unit,
     backToOrders: Boolean,
     onDone: () -> Unit,
+    onSupport: () -> Unit = {},
 ) {
     val paymentState by viewModel.state.collectAsState()
     val confirmed = order.status.equals("confirmed", ignoreCase = true)
@@ -95,6 +96,7 @@ fun OrderResultPage(
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
         ) {
+            TextButton(onClick = onSupport, enabled = !busy) { Text(stringResource(Res.string.support_contact)) }
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),

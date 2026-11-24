@@ -75,7 +75,7 @@ class OrganizerTest {
             tickets.update("sales_start", "2027-01-01T10:00:00+05:00")
             tickets.update("sales_end", "2027-02-01T10:00:00+05:00")
             tickets.save(); tickets.save(); tickets.state.first { !it.saving }
-            val issued = tickets.state.value.added.getValue(draft.id).single()
+            val issued = tickets.state.value.loaded.getValue(draft.id).single()
             assertEquals(0, issued.price)
             assertEquals(10, issued.maxPerOrder)
             assertEquals(draft.id, issued.eventId)
@@ -157,7 +157,7 @@ class OrganizerTest {
             assertFailsWith<EventsApiException> { publicEvents.getEvent(draft.id) }
             events.backToList(); events.state.first { !it.loading }
             tickets.open(published.id)
-            assertTrue(tickets.state.value.added[published.id].isNullOrEmpty())
+            assertTrue(tickets.state.value.loaded[published.id].isNullOrEmpty())
             tickets.close()
             create.reset()
             assertTrue(events.state.value.events.all { it.organizerId == vm.state.value.profile?.id })
@@ -171,12 +171,12 @@ class OrganizerTest {
             assertTrue(session.tokens.value!!.accessToken.startsWith("mock-rotated-access-"))
             session.save(AuthTokens("mock-empty-access-token","mock-empty-refresh-token","bearer"))
             runCurrent(); assertNull(vm.state.value.profile)
-            assertTrue(tickets.state.value.added.isEmpty())
+            assertTrue(tickets.state.value.loaded.isEmpty())
             tickets.edit(issued)
             tickets.update("price","77")
             tickets.save(); tickets.state.first { !it.saving }
             assertTrue(tickets.state.value.failed)
-            assertTrue(tickets.state.value.added.isEmpty())
+            assertTrue(tickets.state.value.loaded.isEmpty())
             tickets.close()
             assertTrue(events.state.value.events.isEmpty())
             vm.load(); vm.state.first { !it.loading }; assertTrue(vm.state.value.absent)
