@@ -666,4 +666,10 @@
     <string name="admin_unsuspend">Разблокировать</string>
     <string name="admin_events">Мероприятия</string>
     <string name="admin_organizer">организатор</string>
+    <string name="admin_reports">Жалобы на мероприятия</string>
+    <string name="admin_open_event">Открыть мероприятие</string>
+    <string name="admin_note">Заметка (до 2000 символов)</string>
+    <string name="admin_report_dismiss">Отклонить</string>
+    <string name="admin_report_action">Меры приняты</string>
+    <string name="admin_reviewed">Рассмотрена</string>
 </resources>

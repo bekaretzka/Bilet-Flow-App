@@ -44,6 +44,7 @@ internal val adminJson = Json { ignoreUnknownKeys = true }
 enum class AdminList(val path: String, val key: String, val hasQ: Boolean, val filters: Map<String, List<String>?>) {
     Users("/admin/users", "users", true, mapOf("suspended" to listOf("true", "false"))),
     Events("/admin/events", "events", true, mapOf("status" to listOf("draft", "published", "cancelled"), "suspended" to listOf("true", "false"))),
+    Reports("/admin/event-reports", "event-reports", false, mapOf("status" to listOf("open", "dismissed", "actioned"), "event_id" to null)),
 }
 
 data class AdminCsv(val bytes: ByteArray, val fileName: String)
@@ -247,6 +248,7 @@ internal fun adminFailureText(failure: AdminFailure): String = when {
 private fun adminListTitle(list: AdminList): String = when (list) {
     AdminList.Users -> stringResource(Res.string.admin_users)
     AdminList.Events -> stringResource(Res.string.admin_events)
+    AdminList.Reports -> stringResource(Res.string.admin_reports)
 }
 
 @Composable
@@ -328,6 +330,12 @@ private fun AdminRow(list: AdminList, row: JsonObject) {
             Text("#${row.id} ${row.text("title").orEmpty()}")
             Text("${row.text("status").orEmpty()} · ${row.text("start_time").orEmpty()} · ${stringResource(Res.string.admin_organizer)} #${row.text("organizer_id").orEmpty()}")
             row.text("venue_name")?.let { Text(it) }
+        }
+        AdminList.Reports -> {
+            Text("#${row.id} · ${stringResource(Res.string.support_event)} #${row.text("event_id").orEmpty()} · ${row.text("status").orEmpty()}")
+            Text("${row.text("reason").orEmpty()} · ${row.text("created_at").orEmpty()}")
+            row.text("details")?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            row.text("reviewed_at")?.let { Text("${stringResource(Res.string.admin_reviewed)}: $it · #${row.text("reviewed_by_user_id").orEmpty()} · ${row.text("review_note").orEmpty()}", style = MaterialTheme.typography.bodySmall) }
             row.text("suspended_at")?.let { Text("${stringResource(Res.string.admin_suspended)}: $it · ${row.text("suspension_reason").orEmpty()}", color = MaterialTheme.colorScheme.error) }
         }
     }
@@ -351,6 +359,17 @@ private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, 
                 .forEach { key -> row.text(key)?.let { Text("$key: $it", style = MaterialTheme.typography.bodySmall) } }
             OutlinedButton(onClick = { onEventHistory(id, row.text("title").orEmpty()) }) { Text(stringResource(Res.string.history_title)) }
             SuspendControls(vm, state, id, row.text("suspended_at") != null)
+        }
+        AdminList.Reports -> {
+            val eventId = (row["event_id"] as? JsonPrimitive)?.intOrNull
+            // suspending the event is a separate action on the event card
+            if (eventId != null) OutlinedButton(onClick = { vm.openList(AdminList.Events, q = "$eventId") }) { Text(stringResource(Res.string.admin_open_event)) }
+            OutlinedTextField(state.reason, vm::setReason, enabled = !state.busy, isError = state.reasonInvalid, modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(Res.string.admin_note)) }, supportingText = { Text("${state.reason.trim().length}/2000") })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("dismissed", "actioned").forEach { status -> Button(onClick = { vm.reviewReport(id, eventId, status) }, enabled = !state.busy) {
+                    Text(stringResource(if (status == "dismissed") Res.string.admin_report_dismiss else Res.string.admin_report_action)) } }
+            }
         }
     }
 }
@@ -402,4 +421,14 @@ internal fun SuspendControls(vm: AdminViewModel, state: AdminState, id: Int, sus
         if (state.reasonInvalid) Text(stringResource(Res.string.admin_reason_invalid), color = MaterialTheme.colorScheme.error)
         Button(onClick = { vm.setSuspended(id, true) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_suspend)) }
     }
+}
+
+/** POST /admin/event-reports/{id}/review {status, note?}. Unknown result: re-read reports filtered by event_id and find this id. */
+fun AdminViewModel.reviewReport(id: Int, eventId: Int?, status: String) {
+    val note = state.value.reason.trim()
+    if (note.length > 2000) { update { it.copy(reasonInvalid = true) }; return }
+    action(id, HttpMethod.Post, "/admin/event-reports/$id/review",
+        body = buildJsonObject { put("status", status); if (note.isNotEmpty()) put("note", note) },
+        verify = { findInList("/admin/event-reports", id, eventId?.let { mapOf("event_id" to "$it") } ?: emptyMap()) },
+        onDone = { update { it.copy(reason = "") } })
 }

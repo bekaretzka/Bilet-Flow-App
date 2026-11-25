@@ -666,4 +666,10 @@
     <string name="admin_unsuspend">Unsuspend</string>
     <string name="admin_events">Events</string>
     <string name="admin_organizer">organizer</string>
+    <string name="admin_reports">Event reports</string>
+    <string name="admin_open_event">Open the event</string>
+    <string name="admin_note">Note (up to 2000 characters)</string>
+    <string name="admin_report_dismiss">Dismiss</string>
+    <string name="admin_report_action">Mark as actioned</string>
+    <string name="admin_reviewed">Reviewed</string>
 </resources>
