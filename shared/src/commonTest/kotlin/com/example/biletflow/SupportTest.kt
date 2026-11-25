@@ -83,6 +83,27 @@ class SupportTest {
             assertEquals(2,supportTextLength("😀😀"))
         } finally {gate.complete(Unit);vm.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
     }
+    @Test fun formSendsOnlyMostSpecificContextEvenWhenEventIsKnown()=runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val client=createMockEventsHttpClient();val bodies=mutableListOf<JsonObject>()
+        client.plugin(HttpSend).intercept {request ->
+            if(request.url.build().encodedPath=="/support/cases" && request.method==HttpMethod.Post) bodies.add(Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject)
+            execute(request)
+        }
+        val store=session();val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),AuthRepositoryImpl(client,"http://test"),store,backgroundScope)
+        val vm=SupportViewModel(client,requests,store,"http://test")
+        try {
+            suspend fun send(eventId:Int,orderId:Int?=null,ticketId:Int?=null):Int? {
+                vm.open(eventId,orderId,ticketId);vm.update("subject","Context $eventId $orderId $ticketId");vm.update("message","Body");vm.submit()
+                return vm.state.first {it.created!=null || it.error!=null || it.unknown}.created?.eventId
+            }
+            assertEquals(102,send(102))
+            assertEquals(101,send(101,7102))
+            assertEquals(101,send(101,7102,71020))
+            assertEquals(listOf(setOf("event_id"),setOf("order_id"),setOf("ticket_id")),bodies.map {body -> body.keys.filter {it.endsWith("_id")}.toSet()})
+            assertEquals(listOf(102,7102,71020),listOf("event_id","order_id","ticket_id").mapIndexed {i,key -> bodies[i].getValue(key).jsonPrimitive.int})
+        } finally {vm.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
+    }
     @Test fun guestLoginPreservesFormAndAccountChangeIgnoresLateResponse()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val client=createMockEventsHttpClient();val gate=CompletableDeferred<Unit>();var hold=false

@@ -78,19 +78,11 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
     val supportCaseOwners = mutableMapOf<Int, String>()
     val supportCaseReads = mutableMapOf<String, Int>()
     var nextSupportCaseId = 20000
-    val supportEntries = mutableMapOf<Pair<String, String>, Pair<JsonObject, String>>()
     val supportMutex = Mutex()
     val campaignMutex = Mutex()
     var nextCampaignId = 12000
     val campaigns = mutableMapOf<Int,JsonObject>()
     val campaignKeys = mutableMapOf<Triple<String,Int,String>,Pair<CampaignCreate,JsonObject>>()
-    var nextSupportMessageId = 100000
-    val supportMessages = mutableMapOf<Int, MutableList<JsonObject>>()
-    val supportMessageResults = mutableMapOf<Triple<String,Int,String>, Pair<String,JsonObject>>()
-    val supportUpdated = mutableMapOf<Int,String>()
-    val supportStatusValues = mutableMapOf<Int,String>()
-    val lostSupportStatusResponses = mutableSetOf<Int>()
-    var nextSupportId = 9000
     var event104TicketAttempts = 0
     val mockOrders = mutableMapOf<Int, String>()
     val paymentAttempts = mutableMapOf<Int, Int>()
@@ -135,24 +127,15 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
         return created + seeded
     }
     fun ownsSupportEvent(owner: String, eventId: Int): Boolean = organizerProfiles.containsKey(owner) && ownedEvents(owner).any { it["id"]?.jsonPrimitive?.int == eventId }
-    fun supportAuthor(record: JsonObject): String? = supportEntries.entries.firstOrNull { Json.parseToJsonElement(it.value.second).jsonObject["id"] == record["id"] }?.key?.first
-    fun canReadSupport(owner: String, record: JsonObject): Boolean = supportAuthor(record) == owner || ownsSupportEvent(owner,record.getValue("event_id").jsonPrimitive.int)
-                fun supportResponse(record: JsonObject, owner: String) = buildJsonObject {
-                    record.forEach { (key,value) -> put(key,value) }
-                    val author = supportAuthor(record)
-                    put("author_name",JsonNull)
-                    put("author_email",author?.let { buyerEmail(it) }?.let(::JsonPrimitive) ?: JsonNull)
-                    val userId = when(author) { "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> author?.removePrefix("Bearer mock-user-")?.toIntOrNull()?.plus(1000) }
-                    put("author_id",userId?.let(::JsonPrimitive) ?: JsonNull)
-                    val requestId = record.getValue("id").jsonPrimitive.int
-                    put("updated_at",supportUpdated[requestId]?.let(::JsonPrimitive) ?: record.getValue("created_at"))
-                    put("status",supportStatusValues[requestId] ?: record.getValue("status").jsonPrimitive.content)
-                    put("can_manage_status",ownsSupportEvent(owner,record.getValue("event_id").jsonPrimitive.int))
-                    val eventId = record.getValue("event_id").jsonPrimitive.int
-                    val event = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == eventId }
-                        ?: mockEvents.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.int == eventId }?.jsonObject
-                    put("event_title",event?.get("title") ?: JsonNull)
-                }
+    var nextSupportMessageId = 100000
+    var supportClock = 0
+    /** Monotonic mock timestamps for support messages and case updates. */
+    fun supportNow(): String { val s = supportClock++; return "2026-11-25T13:${(s / 60 % 60).toString().padStart(2,'0')}:${(s % 60).toString().padStart(2,'0')}+05:00" }
+    fun mockUserId(owner: String): Int = when(owner) { "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> 1000 + owner.removePrefix("Bearer mock-user-").toInt() }
+    /** backend support_service._is_handler: platform admin, or the event owner for attendee cases. */
+    fun supportHandles(owner: String, item: JsonObject): Boolean = isBuyer(owner) && buyerEmail(owner) == "admin@biletflow.kz" ||
+        item["kind"]?.jsonPrimitive?.content == "attendee" && ownsSupportEvent(owner, item["event_id"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1)
+    fun supportValidation(field: String) = buildJsonObject { put("error","VALIDATION_ERROR"); put("message","Invalid data"); put("fields",buildJsonObject { put(field,"Invalid value") }) }.toString()
 
     var nextCreatedOrderId = 7200
     fun paidStatus(owner: String?, id: Int): JsonObject {
@@ -264,7 +247,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                             put("event_id",eventId?.let(::JsonPrimitive) ?: JsonNull);put("order_id",orderId?.let(::JsonPrimitive) ?: JsonNull)
                             put("ticket_id",ticketInput?.let(::JsonPrimitive) ?: JsonNull);put("assigned_user_id",JsonNull)
                             put("created_at","2026-11-25T12:00:00+05:00");put("updated_at","2026-11-25T12:00:00+05:00")
-                            put("messages",buildJsonArray {add(buildJsonObject {put("id",id*10);put("author_user_id",userId);put("body",message);put("created_at","2026-11-25T12:00:00+05:00")})})
+                            put("messages",buildJsonArray {add(buildJsonObject {put("id",nextSupportMessageId++);put("author_user_id",userId);put("body",message);put("created_at","2026-11-25T12:00:00+05:00")})})
                         }
                         supportCases[id]=result;supportCaseOwners[id]=owner
                         if(subject=="support-case-unknown") throw IOException("Case saved; response lost")
@@ -293,6 +276,53 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                                 (request.url.parameters["status"]==null || request.url.parameters["status"]==it["status"]?.jsonPrimitive?.content)
                         }.sortedByDescending {it["id"]?.jsonPrimitive?.int}
                         respondJson(buildJsonArray {items.forEach {row -> add(buildJsonObject {row.filterKeys {it!="messages"}.forEach { (k,v)->put(k,v) }})}}.toString(),HttpStatusCode.OK)
+                    }
+                }
+            }
+            request.method == HttpMethod.Post && path.matches(Regex("/support/cases/\\d+/messages")) -> supportMutex.withLock {
+                val owner=authorizationHeader.orEmpty()
+                val id=path.split('/')[3].toInt();val item=supportCases[id]
+                val input=runCatching {Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject}.getOrNull()
+                val body=(input?.get("body") as? JsonPrimitive)?.takeIf {it.isString}?.content?.trim()
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
+                    // FastAPI validates the body before the service runs, so 422 comes before 404
+                    body==null || com.example.biletflow.presentation.support.supportTextLength(body) !in 1..5000 -> respondJson(supportValidation("body"),HttpStatusCode.UnprocessableEntity)
+                    item==null || supportCaseOwners[id]!=owner && !supportHandles(owner,item) -> respondJson("""{"error":"SupportCaseNotFoundError","message":"Support Case Not Found","fields":null}""",HttpStatusCode.NotFound)
+                    else -> {
+                        val now=supportNow();val author=mockUserId(owner)
+                        val message=buildJsonObject {put("id",nextSupportMessageId++);put("author_user_id",author);put("body",body);put("created_at",now)}
+                        val status=item.getValue("status").jsonPrimitive.content
+                        // backend: only the requester's reply reopens waiting_for_customer or resolved; a handler's reply changes nothing
+                        val reopened=if(supportCaseOwners[id]==owner && status in listOf("waiting_for_customer","resolved")) "open" else status
+                        supportCases[id]=buildJsonObject {
+                            item.forEach {(key,value) -> if(key!="messages" && key!="status" && key!="updated_at") put(key,value)}
+                            put("status",reopened);put("updated_at",now)
+                            put("messages",buildJsonArray {item["messages"]?.jsonArray?.forEach {add(it)};add(message)})
+                        }
+                        respondJson(message.toString(),HttpStatusCode.Created)
+                    }
+                }
+            }
+            request.method == HttpMethod.Patch && path.matches(Regex("/support/cases/\\d+/status")) -> supportMutex.withLock {
+                val owner=authorizationHeader.orEmpty()
+                val id=path.split('/')[3].toInt();val item=supportCases[id]
+                val input=runCatching {Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject}.getOrNull()
+                val target=(input?.get("status") as? JsonPrimitive)?.takeIf {it.isString}?.content
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
+                    target !in com.example.biletflow.data.repositories.supportStatuses -> respondJson(supportValidation("status"),HttpStatusCode.UnprocessableEntity)
+                    item==null || supportCaseOwners[id]!=owner && !supportHandles(owner,item) -> respondJson("""{"error":"SupportCaseNotFoundError","message":"Support Case Not Found","fields":null}""",HttpStatusCode.NotFound)
+                    !supportHandles(owner,item) -> respondJson("""{"error":"SupportCaseAccessDeniedError","message":"Only The Case Handlers Can Do This","fields":null}""",HttpStatusCode.Forbidden)
+                    item.getValue("status").jsonPrimitive.content==target -> respondJson(item.toString(),HttpStatusCode.OK)
+                    else -> {
+                        // backend allows any of the four statuses from any status
+                        val updated=buildJsonObject {
+                            item.forEach {(key,value) -> if(key!="status" && key!="updated_at") put(key,value)}
+                            put("status",requireNotNull(target));put("updated_at",supportNow())
+                        }
+                        supportCases[id]=updated
+                        respondJson(updated.toString(),HttpStatusCode.OK)
                     }
                 }
             }
@@ -373,175 +403,6 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                                 respondJson(result.toString(),HttpStatusCode.Created)
                             }
                         }
-                    }
-                }
-            }
-            request.method == HttpMethod.Patch && path.matches(Regex("/support/requests/\\d+/status")) -> supportMutex.withLock {
-                val owner = authorizationHeader.orEmpty()
-                val id = path.split('/')[3].toInt()
-                val found = supportEntries.values.map { Json.parseToJsonElement(it.second).jsonObject }.firstOrNull { it["id"]?.jsonPrimitive?.int == id }
-                val input = runCatching { Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject }.getOrNull()
-                val target = (input?.get("status") as? JsonPrimitive)?.contentOrNull
-                val expected = (input?.get("expected_status") as? JsonPrimitive)?.contentOrNull
-                val current = supportStatusValues[id] ?: "open"
-                when {
-                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
-                    found == null -> respondJson("""{"error":"SupportRequestNotFoundError","message":"Request not found"}""",HttpStatusCode.NotFound)
-                    !ownsSupportEvent(owner,found.getValue("event_id").jsonPrimitive.int) -> respondJson("""{"error":"SupportStatusAccessDeniedError","message":"Only the event owner may change status"}""",HttpStatusCode.Forbidden)
-                    target !in com.example.biletflow.data.repositories.supportStatuses || expected !in com.example.biletflow.data.repositories.supportStatuses -> respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid status fields","fields":{"status":"Unknown status"}}""",HttpStatusCode.UnprocessableEntity)
-                    current == target -> respondJson(supportResponse(found,owner).toString(),HttpStatusCode.OK)
-                    current != expected -> respondJson("""{"error":"SupportStatusConflictError","message":"Status changed. Read the request again."}""",HttpStatusCode.Conflict)
-                    target !in com.example.biletflow.data.repositories.supportTransitions(current) -> respondJson("""{"error":"SupportStatusTransitionError","message":"Transition is not allowed"}""",HttpStatusCode.Conflict)
-                    else -> {
-                        supportStatusValues[id] = requireNotNull(target)
-                        supportUpdated[id] = "2026-11-25T11:00:00+05:00"
-                        if(found["subject"]?.jsonPrimitive?.content == "status-unknown" && lostSupportStatusResponses.add(id)) throw IOException("Mock status response lost after update")
-                        respondJson(supportResponse(found,owner).toString(),HttpStatusCode.OK)
-                    }
-                }
-            }
-            request.method == HttpMethod.Get && (path == "/support/requests/me" || path.matches(Regex("/organizer/events/\\d+/support/requests")) || path.matches(Regex("/support/requests/\\d+(?:/messages)?"))) -> supportMutex.withLock {
-                val owner = authorizationHeader.orEmpty()
-                val eventContext = if(path.startsWith("/organizer/")) path.split('/')[3].toInt() else null
-                val id = if(eventContext == null) path.split('/').getOrNull(3)?.toIntOrNull() else null
-                val messages = path.endsWith("/messages")
-                val records = supportEntries.values.map { Json.parseToJsonElement(it.second).jsonObject }.filter { record ->
-                    if(eventContext != null) record["event_id"]?.jsonPrimitive?.int == eventContext
-                    else if(id != null) canReadSupport(owner,record) else supportAuthor(record) == owner
-                }
-                val found = records.firstOrNull { it["id"]?.jsonPrimitive?.int == id }
-                val rawLimit = request.url.parameters["limit"]
-                val limit = rawLimit?.toIntOrNull() ?: if(rawLimit == null) 50 else 0
-                val cursor = request.url.parameters["cursor"]
-                val afterRaw = request.url.parameters["after_id"]
-                val after = afterRaw?.toIntOrNull()
-                val prefix = if(messages && after != null) "support-$id-after-$after-" else if(messages) "support-$id-before-" else if(eventContext != null) "support-event-$eventContext-before-" else "support-before-"
-                val before = cursor?.removePrefix(prefix)?.toIntOrNull()?.takeIf { cursor.startsWith(prefix) }
-                when {
-                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
-                    eventContext != null && mockEvents.none { it.jsonObject["id"]?.jsonPrimitive?.int == eventContext } && createdEvents.values.flatten().none { it["id"]?.jsonPrimitive?.int == eventContext } -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                    eventContext != null && !ownsSupportEvent(owner,eventContext) -> respondJson("""{"error":"EventAccessDeniedError","message":"Not event owner"}""",HttpStatusCode.Forbidden)
-                    id != null && found == null -> respondJson("""{"error":"SupportRequestNotFoundError","message":"Request not found"}""",HttpStatusCode.NotFound)
-                    limit !in 1..100 || afterRaw != null && (!messages || after == null || after < 0) || cursor != null && (before == null || before <= 0) -> respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid cursor or limit"}""",HttpStatusCode.UnprocessableEntity)
-                    id != null && !messages -> respondJson(supportResponse(requireNotNull(found),owner).toString(),HttpStatusCode.OK)
-                    else -> {
-                        val source = if(messages) supportMessages[id].orEmpty() else records.map { supportResponse(it,owner) }
-                        val ordered = if(messages && after != null) source.sortedBy { it.getValue("id").jsonPrimitive.int }
-                            else if(messages) source.sortedByDescending { it.getValue("id").jsonPrimitive.int }
-                            else source.sortedWith(compareByDescending<JsonObject> { Instant.parse(it.getValue("updated_at").jsonPrimitive.content) }.thenByDescending { it.getValue("id").jsonPrimitive.int })
-                        val remaining = if(messages) ordered.filter {
-                            val messageId = it.getValue("id").jsonPrimitive.int
-                            if(after != null) messageId > (before ?: after) else before == null || messageId < before
-                        } else if(before == null) ordered else ordered.dropWhile { it.getValue("id").jsonPrimitive.int != before }.drop(1)
-                        val page = remaining.take(limit)
-                        respondJson(buildJsonObject {
-                            put("items",JsonArray(page))
-                            put("next_cursor",if(remaining.size > limit) JsonPrimitive(prefix + page.last().getValue("id").jsonPrimitive.int) else JsonNull)
-                        }.toString(),HttpStatusCode.OK)
-                    }
-                }
-            }
-            request.method == HttpMethod.Post && path.matches(Regex("/support/requests/\\d+/messages")) -> supportMutex.withLock {
-                val owner = authorizationHeader.orEmpty()
-                val id = path.split('/')[3].toInt()
-                val found = supportEntries.values.map { Json.parseToJsonElement(it.second).jsonObject }.firstOrNull { it["id"]?.jsonPrimitive?.int == id && canReadSupport(owner,it) }
-                val input = runCatching { Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject }.getOrNull()
-                val body = (input?.get("body") as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
-                val key = (input?.get("client_request_id") as? JsonPrimitive)?.contentOrNull.orEmpty()
-                val length = body.indices.count { it == 0 || !body[it].isLowSurrogate() || !body[it-1].isHighSurrogate() }
-                val saved = supportMessageResults[Triple(owner,id,key)]
-                when {
-                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
-                    found == null -> respondJson("""{"error":"SupportRequestNotFoundError","message":"Request not found"}""",HttpStatusCode.NotFound)
-                    length !in 1..5000 || !Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}").matches(key) -> respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid message or request ID","fields":{"body":"1–5000 characters"}}""",HttpStatusCode.UnprocessableEntity)
-                    saved != null && saved.first != body -> respondJson("""{"error":"ClientRequestConflictError","message":"Request ID used with different body"}""",HttpStatusCode.Conflict)
-                    saved != null -> respondJson(saved.second.toString(),HttpStatusCode.Created)
-                    supportStatusValues[id] == "resolved" -> respondJson("""{"error":"SupportRequestClosedError","message":"Request is closed"}""",HttpStatusCode.Conflict)
-                    body == "message-offline" -> throw IOException("Mock message unavailable")
-                    else -> {
-                        val result = buildJsonObject {
-                            put("id",nextSupportMessageId++); put("request_id",id); put("author_name",JsonNull); put("author_role",if(supportAuthor(requireNotNull(found)) == owner) "visitor" else "organizer")
-                            put("text",body); put("created_at","2026-11-25T10:00:00+05:00")
-                        }
-                        supportMessages.getOrPut(id) { mutableListOf() }.add(result)
-                        supportUpdated[id] = maxOf(supportUpdated[id].orEmpty(),result.getValue("created_at").jsonPrimitive.content)
-                        supportMessageResults[Triple(owner,id,key)] = body to result
-                        if(body == "message-unknown") throw IOException("Mock message response lost after save")
-                        respondJson(result.toString(),HttpStatusCode.Created)
-                    }
-                }
-            }
-            request.method == HttpMethod.Post && path == "/support/requests" -> supportMutex.withLock {
-                val owner = authorizationHeader.orEmpty()
-                val input = runCatching { Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject }.getOrNull()
-                fun value(key: String) = (input?.get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
-                fun number(key: String) = (input?.get(key) as? JsonPrimitive)?.intOrNull
-                val eventId = number("event_id")
-                val orderId = number("order_id")
-                val ticketId = number("ticket_id")
-                val category = value("category"); val subject = value("subject").trim(); val message = value("message").trim()
-                val requestId = value("client_request_id")
-                fun length(text: String) = text.indices.count { it == 0 || !text[it].isLowSurrogate() || !text[it-1].isHighSurrogate() }
-                val errors = buildList {
-                    if (eventId == null || eventId <= 0) add("event_id")
-                    listOf("order_id", "ticket_id").forEach { key ->
-                        if(input?.get(key) != null && input[key] != JsonNull && (number(key) ?: 0) <= 0) add(key)
-                    }
-                    if(category !in listOf("event_question", "ticket_issue", "payment_issue", "other")) add("category")
-                    if(length(subject) !in 3..200) add("subject")
-                    if(length(message) !in 1..5000) add("message")
-                    if(!Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}").matches(requestId)) add("client_request_id")
-                }
-                val canonical = buildJsonObject {
-                    put("event_id", eventId?.let(::JsonPrimitive) ?: JsonNull)
-                    put("order_id", orderId?.let(::JsonPrimitive) ?: JsonNull); put("ticket_id", ticketId?.let(::JsonPrimitive) ?: JsonNull)
-                    put("category",category); put("subject",subject); put("message",message); put("client_request_id",requestId)
-                }
-                val saved = supportEntries[owner to requestId]
-                val event = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == eventId }
-                    ?: mockEvents.firstOrNull { it.jsonObject["id"]?.jsonPrimitive?.int == eventId }?.jsonObject
-                val order = orderId?.let { mockOrders[it] }?.let { Json.parseToJsonElement(it).jsonObject }
-                val ticketOrder = ticketId?.let { id -> mockOrders.entries.firstOrNull { (_,json) ->
-                    Json.parseToJsonElement(json).jsonObject["tickets"]?.jsonArray.orEmpty().any { it.jsonObject["id"]?.jsonPrimitive?.int == id }
-                } }
-                val ticketOrderJson = ticketOrder?.value?.let { Json.parseToJsonElement(it).jsonObject }
-                when {
-                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
-                    errors.isNotEmpty() -> respondJson(buildJsonObject {
-                        put("error","VALIDATION_ERROR"); put("message","Validation failed")
-                        put("fields",buildJsonObject { errors.forEach { put(it,"Invalid value") } })
-                    }.toString(),HttpStatusCode.UnprocessableEntity)
-                    saved != null && saved.first != canonical -> respondJson("""{"error":"ClientRequestConflictError","message":"Request ID already used with another body","fields":{"client_request_id":"Conflict"}}""",HttpStatusCode.Conflict)
-                    saved != null -> respondJson(saved.second,HttpStatusCode.Created)
-                    event == null || orderId == null && ticketId == null && (event["status"]?.jsonPrimitive?.content != "published" || event["visibility"]?.jsonPrimitive?.content == "private") -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                    orderId != null && (order == null || orderOwners[orderId] != owner || order["event_id"]?.jsonPrimitive?.int != eventId) -> respondJson(MOCK_ORDER_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                    ticketId != null && (ticketOrder == null || orderOwners[ticketOrder.key] != owner || ticketOrderJson?.get("event_id")?.jsonPrimitive?.int != eventId || orderId != null && ticketOrder.key != orderId) -> respondJson(MOCK_TICKET_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                    subject == "support-offline" -> throw IOException("Mock support unavailable")
-                    else -> {
-                        val result = buildJsonObject {
-                            canonical.forEach { (key,value) -> put(key,value) }
-                            put("order_id", (orderId ?: ticketOrder?.key)?.let(::JsonPrimitive) ?: JsonNull)
-                            put("id",nextSupportId++); put("status","open"); put("created_at","2026-11-24T14:00:00+05:00")
-                        }.toString()
-                        supportEntries[owner to requestId] = canonical to result
-                        val stored = Json.parseToJsonElement(result).jsonObject
-                        val newId = stored.getValue("id").jsonPrimitive.int
-                        supportMessages[newId] = mutableListOf(buildJsonObject {
-                            put("id",newId); put("request_id",newId); put("author_name",JsonNull); put("author_role","visitor")
-                            put("text",message); put("created_at",stored.getValue("created_at"))
-                        })
-                        // Explicit debug fixture for checking pagination and visible scroll anchoring.
-                        if(subject == "support-history") repeat(65) { index ->
-                            supportMessages.getValue(newId).add(buildJsonObject {
-                                put("id",nextSupportMessageId++); put("request_id",newId)
-                                put("author_name",JsonNull); put("author_role",if(index % 2 == 0) "organizer" else "visitor")
-                                put("text","History ${index + 1}"); put("created_at","2026-11-25T09:00:00+05:00")
-                            })
-                            supportUpdated[newId] = "2026-11-25T09:00:00+05:00"
-                        }
-                        if(subject == "support-closed") supportStatusValues[newId] = "resolved"
-                        if(subject == "support-unknown") throw IOException("Mock support response lost after creation")
-                        respondJson(result,HttpStatusCode.Created)
                     }
                 }
             }

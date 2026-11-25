@@ -1,6 +1,7 @@
 package com.example.biletflow.data.repositories
 
 import com.example.biletflow.core.network.apiBaseUrl
+import com.example.biletflow.domain.models.CurrentUser
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.*
@@ -10,6 +11,8 @@ import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 
 val attendeeCaseCategories = listOf("ticket_delivery","payment","refund","seating","event_information","check_in","account","technical")
+/** backend schemas/support.py SupportStatus: PATCH /status accepts any of these, from any current status. */
+val supportStatuses = listOf("open","in_progress","waiting_for_customer","resolved")
 @Serializable
 data class SupportCaseCreate(val kind:String="attendee",val category:String,val subject:String,val message:String,
     @SerialName("event_id") val eventId:Int?=null,@SerialName("order_id") val orderId:Int?=null,@SerialName("ticket_id") val ticketId:Int?=null)
@@ -22,8 +25,24 @@ data class SupportCase(val id:Int,val kind:String,val category:String,val subjec
     @SerialName("assigned_user_id") val assignedUserId:Int?,
     @SerialName("created_at") val createdAt:String,@SerialName("updated_at") val updatedAt:String,
     val messages:List<SupportCaseMessage> = emptyList())
+/** PATCH /status result; [includesMessages] is false when the body had no messages array, so the caller re-reads the case. */
+data class SupportStatusResult(val case:SupportCase,val includesMessages:Boolean)
 
-/** Current backend contract. Historical SupportRepository is retained only for the unmigrated thread. */
+class SupportApiException(val statusCode:Int,val code:String?,val fields:Set<String>,override val message:String):Exception(message)
+
+/** Parses both the current {"error","message","fields"} body and the older FastAPI {"detail": ...} body. */
+fun parseSupportError(status:Int,text:String):SupportApiException {
+    val body=runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()
+    val detail=body?.get("detail")
+    val code=(body?.get("error") as? JsonPrimitive)?.contentOrNull
+        ?: (detail as? JsonPrimitive)?.contentOrNull?.takeIf { it.endsWith("Error") }
+        ?: if(detail is JsonArray) "VALIDATION_ERROR" else null
+    val fields=(body?.get("fields") as? JsonObject)?.keys.orEmpty()+
+        (detail as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.get("loc")?.jsonArray?.lastOrNull()?.jsonPrimitive?.contentOrNull }
+    val message=((body?.get("message") ?: detail) as? JsonPrimitive)?.contentOrNull ?: (body?.get("message") ?: detail)?.toString() ?: "HTTP $status"
+    return SupportApiException(status,code,fields,message)
+}
+
 class SupportCasesRepository(private val client:HttpClient,private val requests:SessionOrdersRepository,private val baseUrl:String=apiBaseUrl) {
     suspend fun create(payload:SupportCaseCreate):SupportCase = requests.request { token ->
         // Build explicitly: exactly one context is sent, with no null links or idempotency key.
@@ -42,16 +61,31 @@ class SupportCasesRepository(private val client:HttpClient,private val requests:
     suspend fun inbox():List<SupportCase> = read("/support/cases/inbox")
     suspend fun eventInbox(eventId:Int):List<SupportCase> = inbox().filter { it.eventId==eventId }
     suspend fun get(id:Int):SupportCase = read<SupportCase>("/support/cases/$id").also { require(it.id==id) }
+    suspend fun me():CurrentUser = read("/auth/me")
+    /** POST /support/cases/{id}/messages with only {"body"}; never retried automatically. */
+    suspend fun send(id:Int,body:String):SupportCaseMessage = requests.request { token ->
+        val response=client.post("$baseUrl/support/cases/$id/messages") {
+            bearerAuth(token);contentType(ContentType.Application.Json);setBody(buildJsonObject { put("body",body) })
+        }
+        response.checkStatus(201);response.body<SupportCaseMessage>()
+    }
+    /** PATCH /support/cases/{id}/status with only {"status"}. */
+    suspend fun changeStatus(id:Int,status:String):SupportStatusResult = requests.request { token ->
+        val response=client.patch("$baseUrl/support/cases/$id/status") {
+            bearerAuth(token);contentType(ContentType.Application.Json);setBody(buildJsonObject { put("status",status) })
+        }
+        response.checkStatus(200)
+        val json=Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val case=supportJson.decodeFromJsonElement(SupportCase.serializer(),json)
+        require(case.id==id)
+        SupportStatusResult(case,json["messages"] is JsonArray)
+    }
     private suspend inline fun <reified T> read(path:String):T = requests.request { token ->
         val response=client.get("$baseUrl$path") {bearerAuth(token)}
         response.checkStatus(200);response.body<T>()
     }
     private suspend fun HttpResponse.checkStatus(expected:Int) {
-        if(status.value==expected) return
-        val body=runCatching { Json.parseToJsonElement(bodyAsText()).jsonObject }.getOrNull()
-        val code=(body?.get("error") as? JsonPrimitive)?.contentOrNull
-        val fields=(body?.get("fields") as? JsonObject)?.keys.orEmpty()+
-            (body?.get("detail") as? JsonArray).orEmpty().mapNotNull { it.jsonObject["loc"]?.jsonArray?.lastOrNull()?.jsonPrimitive?.contentOrNull }
-        throw SupportApiException(status.value,code,fields,(body?.get("message")?:body?.get("detail"))?.toString() ?: "HTTP ${status.value}")
+        if(status.value!=expected) throw parseSupportError(status.value,bodyAsText())
     }
 }
+private val supportJson=Json { ignoreUnknownKeys=true }
