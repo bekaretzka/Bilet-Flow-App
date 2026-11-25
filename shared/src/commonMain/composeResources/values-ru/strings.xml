@@ -614,4 +614,16 @@
     <string name="email_resend">Отправить письмо ещё раз</string>
     <string name="email_resend_sent">Письмо отправлено.</string>
     <string name="email_resend_failed">Не удалось отправить письмо</string>
+    <string name="report_event">Пожаловаться на мероприятие</string>
+    <string name="report_fraud">Мошенничество</string>
+    <string name="report_inappropriate">Неприемлемое содержание</string>
+    <string name="report_misleading">Вводит в заблуждение</string>
+    <string name="report_spam">Спам</string>
+    <string name="report_other">Другое</string>
+    <string name="report_details">Подробности (необязательно, до 2000 символов)</string>
+    <string name="report_send">Отправить жалобу</string>
+    <string name="report_sent">Жалоба отправлена. Спасибо.</string>
+    <string name="report_already">Вы уже отправили жалобу.</string>
+    <string name="report_unknown">Результат неизвестен из-за ошибки сети. Повторно не отправлялось.</string>
+    <string name="report_failed">Не удалось отправить жалобу</string>
 </resources>

@@ -614,4 +614,16 @@
     <string name="email_resend">Resend verification email</string>
     <string name="email_resend_sent">Verification email sent.</string>
     <string name="email_resend_failed">Unable to send the email</string>
+    <string name="report_event">Report this event</string>
+    <string name="report_fraud">Fraud</string>
+    <string name="report_inappropriate">Inappropriate</string>
+    <string name="report_misleading">Misleading</string>
+    <string name="report_spam">Spam</string>
+    <string name="report_other">Other</string>
+    <string name="report_details">Details (optional, up to 2000 characters)</string>
+    <string name="report_send">Send report</string>
+    <string name="report_sent">Report sent. Thank you.</string>
+    <string name="report_already">You have already reported this event.</string>
+    <string name="report_unknown">Result unknown because of a network error. It was not re-sent.</string>
+    <string name="report_failed">Unable to send the report</string>
 </resources>

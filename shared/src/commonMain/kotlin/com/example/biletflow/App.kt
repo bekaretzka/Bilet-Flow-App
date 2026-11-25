@@ -574,6 +574,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                     selectedEventId?.let { supportVm.open(it) }
                     if (session == null) { loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true }
                 },
+                onLogin = { loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true },
             )
         }
         }

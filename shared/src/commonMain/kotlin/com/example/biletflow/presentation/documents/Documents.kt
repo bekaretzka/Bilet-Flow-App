@@ -18,6 +18,10 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.decodeToImageBitmap
@@ -33,6 +37,18 @@ class DocumentDownloader(private val client: HttpClient, private val requests: S
         if (!type.startsWith(mimeType, ignoreCase = true)) throw OrdersApiException(502, null, "Unexpected content type $type")
         response.body<ByteArray>()
     }
+    suspend fun <T> requestsCall(call: suspend (HttpClient, String, String) -> T): T = requests.request { token -> call(client, baseUrl, token) }
+}
+
+/** Authorized JSON POST used by small actions (event report). Returns the response text; never retried after a network failure. */
+suspend fun DocumentDownloader.postJson(path: String, body: kotlinx.serialization.json.JsonObject, expected: Int): String = requestsCall { client, baseUrl, token ->
+    val response = client.post("$baseUrl$path") {
+        bearerAuth(token); contentType(ContentType.Application.Json)
+        setBody(body)
+    }
+    val text = response.bodyAsText()
+    if (response.status.value != expected) throw insightsError(response.status.value, text)
+    text
 }
 
 val LocalDocuments = staticCompositionLocalOf<DocumentDownloader?> { null }
