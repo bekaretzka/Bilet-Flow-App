@@ -659,4 +659,9 @@
     <string name="admin_approve_unknown">The result is unknown. Approving again is safe.</string>
     <string name="admin_no_application">This user has not applied to become an organizer</string>
     <string name="admin_user_not_found">User not found</string>
+    <string name="admin_cannot_suspend_self">You cannot suspend your own account</string>
+    <string name="admin_reason">Reason (3–500 characters)</string>
+    <string name="admin_reason_invalid">The reason must be 3 to 500 characters</string>
+    <string name="admin_suspend">Suspend</string>
+    <string name="admin_unsuspend">Unsuspend</string>
 </resources>

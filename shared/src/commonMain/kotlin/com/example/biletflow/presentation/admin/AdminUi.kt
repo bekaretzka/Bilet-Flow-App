@@ -54,7 +54,8 @@ data class AdminState(
     val items: List<JsonObject> = emptyList(), val total: Int = 0, val loading: Boolean = false, val error: String? = null,
     val csvBusy: Boolean = false, val csv: AdminCsv? = null, val csvError: String? = null, val denied: Boolean = false,
     val selectedId: Int? = null, val busy: Boolean = false, val actionError: AdminFailure? = null, val actionUnknown: Boolean = false,
-    val actionDone: Boolean = false, val approval: String? = null,
+    val actionDone: Boolean = false, val approval: String? = null, val reason: String = "", val reasonInvalid: Boolean = false,
+    val myId: Int? = null,
 ) {
     val selected: JsonObject? get() = selectedId?.let { id -> items.firstOrNull { it.id == id } }
 }
@@ -103,7 +104,8 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
         val s = mutable.value
         mutable.value = s.copy(filters = if (value.isNullOrEmpty()) s.filters - key else s.filters + (key to value))
     }
-    fun select(id: Int) { mutable.value = mutable.value.copy(selectedId = id, actionError = null, actionUnknown = false, actionDone = false, approval = null) }
+    fun select(id: Int) { mutable.value = mutable.value.copy(selectedId = id, actionError = null, actionUnknown = false, actionDone = false, approval = null,
+        reason = "", reasonInvalid = false, myId = session.user.value?.id) }
     fun reload() = load(append = false)
     fun more() { val s = mutable.value; if (!s.loading && s.items.size < s.total) load(append = true) }
 
@@ -236,6 +238,7 @@ internal fun adminFailureText(failure: AdminFailure): String = when {
     failure.status == 422 || failure.code == "VALIDATION_ERROR" -> stringResource(Res.string.admin_invalid)
     failure.code == "OrganizerNotFoundError" -> stringResource(Res.string.admin_no_application)
     failure.code == "UserNotFoundError" -> stringResource(Res.string.admin_user_not_found)
+    failure.code == "CannotSuspendSelfError" -> stringResource(Res.string.admin_cannot_suspend_self)
     else -> "${stringResource(Res.string.admin_action_failed)} (${failure.code ?: "HTTP ${failure.status}"})"
 }
 
@@ -331,6 +334,8 @@ private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, 
             OutlinedButton(onClick = { vm.approveOrganizer(id) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_approve_organizer)) }
             state.approval?.let { Text("${stringResource(Res.string.admin_organizer_status)}: $it") }
             if (state.actionUnknown && state.approval == null) Text(stringResource(Res.string.admin_approve_unknown))
+            // no suspension offered for my own account; the server still answers 400 CannotSuspendSelfError
+            if (id != state.myId) SuspendControls(vm, state, id, row.text("suspended_at") != null)
         }
     }
 }
@@ -353,5 +358,33 @@ fun AdminViewModel.approveOrganizer(userId: Int) {
             val failure = failure(error)
             update { it.copy(busy = false, actionError = failure, actionUnknown = failure == null, denied = isDenied(error)) }
         }
+    }
+}
+
+/** Reason for a suspension: backend SuspendRequest, 3-500 characters. */
+internal fun validReason(value: String): Boolean = value.trim().length in 3..500
+
+/**
+ * POST {base}/{id}/suspend {reason} or /unsuspend for the open list's row; the answer (AdminUser or Event) replaces the row.
+ * Unknown result: the list is re-read with q=<id> (a numeric q matches the id) and the row is taken from there.
+ */
+fun AdminViewModel.setSuspended(id: Int, suspend: Boolean) {
+    val s = state.value; val list = s.list ?: return
+    if (suspend && !validReason(s.reason)) { update { it.copy(reasonInvalid = true) }; return }
+    val base = list.path
+    action(id, HttpMethod.Post, "$base/$id/${if (suspend) "suspend" else "unsuspend"}",
+        body = if (suspend) buildJsonObject { put("reason", s.reason.trim()) } else null,
+        verify = { findInList(base, id, mapOf("q" to "$id")) }, onDone = { update { it.copy(reason = "") } })
+}
+fun AdminViewModel.setReason(value: String) { update { it.copy(reason = value, reasonInvalid = false) } }
+
+@Composable
+internal fun SuspendControls(vm: AdminViewModel, state: AdminState, id: Int, suspended: Boolean) {
+    if (suspended) Button(onClick = { vm.setSuspended(id, false) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_unsuspend)) }
+    else {
+        OutlinedTextField(state.reason, vm::setReason, enabled = !state.busy, isError = state.reasonInvalid, modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(Res.string.admin_reason)) }, supportingText = { Text("${state.reason.trim().length}/500") })
+        if (state.reasonInvalid) Text(stringResource(Res.string.admin_reason_invalid), color = MaterialTheme.colorScheme.error)
+        Button(onClick = { vm.setSuspended(id, true) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_suspend)) }
     }
 }

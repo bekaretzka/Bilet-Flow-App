@@ -659,4 +659,9 @@
     <string name="admin_approve_unknown">Результат неизвестен. Повторное одобрение безопасно.</string>
     <string name="admin_no_application">Пользователь не подавал заявку в организаторы</string>
     <string name="admin_user_not_found">Пользователь не найден</string>
+    <string name="admin_cannot_suspend_self">Нельзя заблокировать свой аккаунт</string>
+    <string name="admin_reason">Причина (3–500 символов)</string>
+    <string name="admin_reason_invalid">Причина должна быть от 3 до 500 символов</string>
+    <string name="admin_suspend">Заблокировать</string>
+    <string name="admin_unsuspend">Разблокировать</string>
 </resources>
