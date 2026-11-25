@@ -82,7 +82,11 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                     Button(onClick = vm::reload, enabled = !state.loading) { Text(stringResource(Res.string.payment_check_status)) }
                 } else state.statusError?.let {
                     Text(stringResource(Res.string.event_status_failed), color = MaterialTheme.colorScheme.error)
-                    Text(it)
+                    Text(when (it) {
+                        "EventHasTicketsError" -> stringResource(Res.string.event_error_has_tickets)
+                        "EventAlreadyEndedError" -> stringResource(Res.string.event_error_ended)
+                        else -> it
+                    })
                 }
                 if (state.statusSuccess) Text(stringResource(when {
                     event.status == "cancelled" -> Res.string.event_cancelled_success

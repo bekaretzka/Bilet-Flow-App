@@ -195,7 +195,7 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
                 if (expected != session.generation || requestId != sequence || mutable.value.selectedId != id) return@launch
                 val api = error as? OrdersApiException
                 mutable.value = mutable.value.copy(changingStatus = false,
-                    statusUnknown = api == null, statusError = api?.message ?: "unknown",
+                    statusUnknown = api == null, statusError = api?.errorCode?.takeIf { it == "EventHasTicketsError" || it == "EventAlreadyEndedError" } ?: api?.message ?: "unknown",
                     accessDenied = api?.errorCode in listOf("OrganizerNotFoundError", "OrganizerNotApprovedError", "EventAccessDeniedError"))
                 if (api?.errorCode == "InvalidEventStatusError") reload()
             }

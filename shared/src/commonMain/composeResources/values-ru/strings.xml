@@ -757,4 +757,6 @@
     <string name="support_history_status">Статус: %1$s → %2$s (%3$s)</string>
     <string name="support_history_assigned">Назначено: %1$s (%2$s)</string>
     <string name="support_history_nobody">никто</string>
+    <string name="event_error_has_tickets">Билеты уже проданы: снять с публикации нельзя. Вместо этого отмените мероприятие.</string>
+    <string name="event_error_ended">Мероприятие уже прошло, отменить его нельзя.</string>
 </resources>

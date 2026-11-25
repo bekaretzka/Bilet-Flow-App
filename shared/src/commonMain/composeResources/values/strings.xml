@@ -757,4 +757,6 @@
     <string name="support_history_status">Status: %1$s → %2$s (by %3$s)</string>
     <string name="support_history_assigned">Assigned to %1$s (by %2$s)</string>
     <string name="support_history_nobody">nobody</string>
+    <string name="event_error_has_tickets">Tickets are already sold: the event cannot be unpublished. Cancel it instead.</string>
+    <string name="event_error_ended">The event has already ended and cannot be cancelled.</string>
 </resources>
