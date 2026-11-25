@@ -570,4 +570,22 @@
     <string name="promo_not_active">Промокод сейчас не действует.</string>
     <string name="promo_used_up">Лимит использований промокода исчерпан.</string>
     <string name="promo_not_applicable">Промокод не подходит к выбранным билетам.</string>
+    <string name="analytics_title">Аналитика</string>
+    <string name="history_title">История мероприятия</string>
+    <string name="history_type">Тип (event, order, …)</string>
+    <string name="history_action">Действие, например order.refunded</string>
+    <string name="analytics_ticket_type">ID типа билета</string>
+    <string name="insights_date_from">С (ISO 8601 со смещением)</string>
+    <string name="insights_date_to">По (ISO 8601 со смещением)</string>
+    <string name="history_types_help">Типы</string>
+    <string name="insights_apply">Применить фильтры</string>
+    <string name="insights_error">Не удалось загрузить данные.</string>
+    <string name="history_empty">Пока ничего нет</string>
+    <string name="history_automatic">автоматически</string>
+    <string name="history_more">Загрузить ещё</string>
+    <string name="analytics_capacity">Вместимость</string>
+    <string name="analytics_money">Деньги</string>
+    <string name="analytics_check_in">Вход</string>
+    <string name="analytics_absent">Не пришли</string>
+    <string name="analytics_over_time">Продажи по дням</string>
 </resources>

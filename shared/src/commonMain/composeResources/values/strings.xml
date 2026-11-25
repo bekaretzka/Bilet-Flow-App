@@ -570,4 +570,22 @@
     <string name="promo_not_active">This promo code is not active now.</string>
     <string name="promo_used_up">This promo code has been used up.</string>
     <string name="promo_not_applicable">This promo code does not apply to the selected tickets.</string>
+    <string name="analytics_title">Analytics</string>
+    <string name="history_title">Event history</string>
+    <string name="history_type">Type (event, order, …)</string>
+    <string name="history_action">Action, e.g. order.refunded</string>
+    <string name="analytics_ticket_type">Ticket type ID</string>
+    <string name="insights_date_from">From (ISO 8601 with offset)</string>
+    <string name="insights_date_to">To (ISO 8601 with offset)</string>
+    <string name="history_types_help">Types</string>
+    <string name="insights_apply">Apply filters</string>
+    <string name="insights_error">Unable to load data.</string>
+    <string name="history_empty">Nothing yet</string>
+    <string name="history_automatic">automatically</string>
+    <string name="history_more">Load more</string>
+    <string name="analytics_capacity">Capacity</string>
+    <string name="analytics_money">Money</string>
+    <string name="analytics_check_in">Check-in</string>
+    <string name="analytics_absent">Absent</string>
+    <string name="analytics_over_time">Sales over time</string>
 </resources>

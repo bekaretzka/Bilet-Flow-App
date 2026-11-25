@@ -146,6 +146,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         LaunchedEffect(organizerOrdersState.denied) {
             if (organizerOrdersState.denied) { organizerOrdersVm.close(); myEventsVm.close(); organizerVm.load() }
         }
+        val insightsVm: EventInsightsViewModel = viewModel { EventInsightsViewModel(apiClient, ordersRepository, sessionStore) }
+        val insightsState by insightsVm.state.collectAsState()
+        LaunchedEffect(insightsState.denied) {
+            if (insightsState.denied) { insightsVm.close(); myEventsVm.close(); organizerVm.load() }
+        }
         LaunchedEffect(salesState.denied) {
             if (salesState.denied) { salesVm.close(); myEventsVm.close(); organizerVm.load() }
         }
@@ -246,7 +251,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             if(suspended) {
                 campaignsVm.close(); supportHistoryVm.close(); supportVm.close()
                 orderHistoryViewModel.close(); orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
-                eventDetailsViewModel.clearSelection(); organizerOrdersVm.close(); salesVm.close(); attendeesVm.close()
+                eventDetailsViewModel.clearSelection(); organizerOrdersVm.close(); salesVm.close(); insightsVm.close(); attendeesVm.close()
                 staffVm.close(); staffEventsVm.close(); checkInVm.close(); paidSalesVm.close(); myEventsVm.close()
                 createEventVm.reset(); ticketCreateVm.close(); organizerVm.closeForm(); authViewModel.resetForSessionEnd()
                 completedOrder=null; selectedTicketId=null; selectedEventId=null; showOrderReview=false
@@ -264,6 +269,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             supportState.eventId != null && !showLogin -> ({ if (!supportState.sending) supportVm.close() })
             organizerOrdersState.eventId != null && !showLogin -> ({ organizerOrdersVm.back() })
             salesState.eventId != null && !showLogin -> ({ salesVm.close() })
+            insightsState.eventId != null && !showLogin -> ({ insightsVm.close() })
             checkInState.scannerOpen && !showLogin -> ({ checkInVm.closeScanner() })
             checkInState.event != null && !showLogin -> ({ checkInVm.close() })
             staffEventsState.open && !showLogin -> ({ staffEventsVm.close() })
@@ -328,6 +334,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             }
             organizerOrdersState.eventId != null && !showLogin -> OrganizerOrdersPage(organizerOrdersVm)
             salesState.eventId != null && !showLogin -> EventSalesPage(salesVm)
+            insightsState.eventId != null && !showLogin -> EventInsightsPage(insightsVm)
             checkInState.scannerOpen && !showLogin -> QrScannerPage(checkInVm)
             checkInState.event != null && !showLogin -> CheckInOverviewPage(checkInVm, checkInVm::close)
             staffEventsState.open && !showLogin -> StaffEventsPage(staffEventsVm, checkInVm::open)
@@ -341,7 +348,8 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             myEventsState.selectedId != null && !showLogin -> EventManagementPage(myEventsVm, createEventVm::edit, ticketCreateVm,
                 onPaidSales = { paidSalesVm.open(it.id, it.title) }, onAttendees = { attendeesVm.open(it.id, it.title) },
                 onStaff = { staffVm.open(it.id, it.title) }, onSales = { salesVm.open(it.id, it.title) }, onCopy = createEventVm::copySettings,
-                onOrders = { organizerOrdersVm.open(it.id, it.title) }, onSupport = { supportHistoryVm.openEvent(it.id,it.title) }, onCampaigns = { campaignsVm.open(it.id,it.title) })
+                onOrders = { organizerOrdersVm.open(it.id, it.title) }, onSupport = { supportHistoryVm.openEvent(it.id,it.title) }, onCampaigns = { campaignsVm.open(it.id,it.title) },
+                onAnalytics = { insightsVm.openAnalytics(it.id, it.title) }, onHistory = { insightsVm.openHistory(it.id, it.title) })
             myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open)
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(

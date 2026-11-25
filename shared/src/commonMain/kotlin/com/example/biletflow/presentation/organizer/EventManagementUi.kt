@@ -13,7 +13,7 @@ import com.example.biletflow.domain.models.Event
 import com.example.biletflow.presentation.events.formatEventDate
 
 @Composable
-fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}, onAttendees: (Event) -> Unit = {}, onStaff: (Event) -> Unit = {}, onSales: (Event) -> Unit = {}, onCopy: (Event) -> Unit = {}, onOrders: (Event) -> Unit = {}, onSupport: (Event) -> Unit = {}, onCampaigns: (Event) -> Unit = {}) {
+fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets: CreateTicketTypeViewModel, onPaidSales: (Event) -> Unit = {}, onAttendees: (Event) -> Unit = {}, onStaff: (Event) -> Unit = {}, onSales: (Event) -> Unit = {}, onCopy: (Event) -> Unit = {}, onOrders: (Event) -> Unit = {}, onSupport: (Event) -> Unit = {}, onCampaigns: (Event) -> Unit = {}, onAnalytics: (Event) -> Unit = {}, onHistory: (Event) -> Unit = {}) {
     val state by vm.state.collectAsState()
     val ticketState by tickets.state.collectAsState()
     val event = state.events.firstOrNull { it.id == state.selectedId }
@@ -41,6 +41,8 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                 Button(onClick = { onAttendees(event) }) { Text(stringResource(Res.string.attendees_title)) }
                 Button(onClick = { onStaff(event) }) { Text(stringResource(Res.string.staff_title)) }
                 Button(onClick = { onSales(event) }) { Text(stringResource(Res.string.sales_title)) }
+                Button(onClick = { onAnalytics(event) }) { Text(stringResource(Res.string.analytics_title)) }
+                Button(onClick = { onHistory(event) }) { Text(stringResource(Res.string.history_title)) }
                 Button(onClick = { onCampaigns(event) }) { Text(stringResource(Res.string.campaigns_title)) }
                 Button(onClick = { onSupport(event) }) { Text(stringResource(Res.string.support_event_requests)) }
                 Button(onClick = { onOrders(event) }) { Text(stringResource(Res.string.organizer_orders_title)) }
