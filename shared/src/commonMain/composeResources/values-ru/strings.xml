@@ -664,4 +664,6 @@
     <string name="admin_reason_invalid">Причина должна быть от 3 до 500 символов</string>
     <string name="admin_suspend">Заблокировать</string>
     <string name="admin_unsuspend">Разблокировать</string>
+    <string name="admin_events">Мероприятия</string>
+    <string name="admin_organizer">организатор</string>
 </resources>

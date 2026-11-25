@@ -664,4 +664,6 @@
     <string name="admin_reason_invalid">The reason must be 3 to 500 characters</string>
     <string name="admin_suspend">Suspend</string>
     <string name="admin_unsuspend">Unsuspend</string>
+    <string name="admin_events">Events</string>
+    <string name="admin_organizer">organizer</string>
 </resources>

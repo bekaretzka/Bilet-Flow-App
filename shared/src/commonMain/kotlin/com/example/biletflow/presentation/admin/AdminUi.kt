@@ -43,6 +43,7 @@ internal val adminJson = Json { ignoreUnknownKeys = true }
  */
 enum class AdminList(val path: String, val key: String, val hasQ: Boolean, val filters: Map<String, List<String>?>) {
     Users("/admin/users", "users", true, mapOf("suspended" to listOf("true", "false"))),
+    Events("/admin/events", "events", true, mapOf("status" to listOf("draft", "published", "cancelled"), "suspended" to listOf("true", "false"))),
 }
 
 data class AdminCsv(val bytes: ByteArray, val fileName: String)
@@ -245,6 +246,7 @@ internal fun adminFailureText(failure: AdminFailure): String = when {
 @Composable
 private fun adminListTitle(list: AdminList): String = when (list) {
     AdminList.Users -> stringResource(Res.string.admin_users)
+    AdminList.Events -> stringResource(Res.string.admin_events)
 }
 
 @Composable
@@ -256,7 +258,7 @@ private fun filterLabel(key: String): String = when (key) {
 }
 
 @Composable
-fun AdminPage(vm: AdminViewModel) {
+fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit) {
     val state by vm.state.collectAsState()
     val sharer = rememberFileSharer()
     LaunchedEffect(state.csv) { state.csv?.let { vm.csvHandled(!sharer.share(it.bytes, it.fileName, "text/csv")) } }
@@ -270,7 +272,7 @@ fun AdminPage(vm: AdminViewModel) {
                 AdminList.entries.forEach { entry -> OutlinedButton(onClick = { vm.openList(entry) }, modifier = Modifier.fillMaxWidth()) { Text(adminListTitle(entry)) } }
             }
             selected != null -> item {
-                AdminDetail(vm, state, list, selected)
+                AdminDetail(vm, state, list, selected, onEventHistory)
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 state.actionError?.let { Text(adminFailureText(it), color = MaterialTheme.colorScheme.error) }
                 if (state.actionUnknown) Text(stringResource(Res.string.admin_result_unknown), color = MaterialTheme.colorScheme.error)
@@ -322,11 +324,17 @@ private fun AdminRow(list: AdminList, row: JsonObject) {
             Text(stringResource(if (row.text("email_verified_at") != null) Res.string.profile_email_verified else Res.string.profile_email_unverified))
             row.text("suspended_at")?.let { Text("${stringResource(Res.string.admin_suspended)}: $it · ${row.text("suspension_reason").orEmpty()}", color = MaterialTheme.colorScheme.error) }
         }
+        AdminList.Events -> {
+            Text("#${row.id} ${row.text("title").orEmpty()}")
+            Text("${row.text("status").orEmpty()} · ${row.text("start_time").orEmpty()} · ${stringResource(Res.string.admin_organizer)} #${row.text("organizer_id").orEmpty()}")
+            row.text("venue_name")?.let { Text(it) }
+            row.text("suspended_at")?.let { Text("${stringResource(Res.string.admin_suspended)}: $it · ${row.text("suspension_reason").orEmpty()}", color = MaterialTheme.colorScheme.error) }
+        }
     }
 }
 
 @Composable
-private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, row: JsonObject) {
+private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, row: JsonObject, onEventHistory: (Int, String) -> Unit) {
     AdminRow(list, row)
     val id = row.id ?: return
     when (list) {
@@ -336,6 +344,13 @@ private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, 
             if (state.actionUnknown && state.approval == null) Text(stringResource(Res.string.admin_approve_unknown))
             // no suspension offered for my own account; the server still answers 400 CannotSuspendSelfError
             if (id != state.myId) SuspendControls(vm, state, id, row.text("suspended_at") != null)
+        }
+        // Details come from the list row: public GET /events/{id} answers 404 for drafts and suspended events.
+        AdminList.Events -> {
+            listOf("description", "category", "venue_address", "end_time", "visibility", "capacity", "registration_opens_at", "registration_closes_at", "refund_policy", "lifecycle")
+                .forEach { key -> row.text(key)?.let { Text("$key: $it", style = MaterialTheme.typography.bodySmall) } }
+            OutlinedButton(onClick = { onEventHistory(id, row.text("title").orEmpty()) }) { Text(stringResource(Res.string.history_title)) }
+            SuspendControls(vm, state, id, row.text("suspended_at") != null)
         }
     }
 }
