@@ -1,0 +1,57 @@
+package com.example.biletflow.data.repositories
+
+import com.example.biletflow.core.network.apiBaseUrl
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+
+val attendeeCaseCategories = listOf("ticket_delivery","payment","refund","seating","event_information","check_in","account","technical")
+@Serializable
+data class SupportCaseCreate(val kind:String="attendee",val category:String,val subject:String,val message:String,
+    @SerialName("event_id") val eventId:Int?=null,@SerialName("order_id") val orderId:Int?=null,@SerialName("ticket_id") val ticketId:Int?=null)
+@Serializable
+data class SupportCaseMessage(val id:Int,@SerialName("author_user_id") val authorUserId:Int?,val body:String,@SerialName("created_at") val createdAt:String)
+@Serializable
+data class SupportCase(val id:Int,val kind:String,val category:String,val subject:String,val status:String,
+    @SerialName("requester_user_id") val requesterUserId:Int,
+    @SerialName("event_id") val eventId:Int?,@SerialName("order_id") val orderId:Int?,@SerialName("ticket_id") val ticketId:Int?,
+    @SerialName("assigned_user_id") val assignedUserId:Int?,
+    @SerialName("created_at") val createdAt:String,@SerialName("updated_at") val updatedAt:String,
+    val messages:List<SupportCaseMessage> = emptyList())
+
+/** Current backend contract. Historical SupportRepository is retained only for the unmigrated thread. */
+class SupportCasesRepository(private val client:HttpClient,private val requests:SessionOrdersRepository,private val baseUrl:String=apiBaseUrl) {
+    suspend fun create(payload:SupportCaseCreate):SupportCase = requests.request { token ->
+        // Build explicitly: exactly one context is sent, with no null links or idempotency key.
+        val body=buildJsonObject {
+            put("kind",payload.kind);put("category",payload.category);put("subject",payload.subject);put("message",payload.message)
+            payload.eventId?.let { put("event_id",it) };payload.orderId?.let { put("order_id",it) };payload.ticketId?.let { put("ticket_id",it) }
+        }
+        val response=client.post("$baseUrl/support/cases") {bearerAuth(token);contentType(ContentType.Application.Json);setBody(body)}
+        response.checkStatus(201)
+        response.body<SupportCase>().also {
+            require(it.kind==payload.kind && (payload.eventId==null || it.eventId==payload.eventId) &&
+                (payload.orderId==null || it.orderId==payload.orderId) && (payload.ticketId==null || it.ticketId==payload.ticketId))
+        }
+    }
+    suspend fun mine():List<SupportCase> = read("/support/cases/me")
+    suspend fun inbox():List<SupportCase> = read("/support/cases/inbox")
+    suspend fun eventInbox(eventId:Int):List<SupportCase> = inbox().filter { it.eventId==eventId }
+    suspend fun get(id:Int):SupportCase = read<SupportCase>("/support/cases/$id").also { require(it.id==id) }
+    private suspend inline fun <reified T> read(path:String):T = requests.request { token ->
+        val response=client.get("$baseUrl$path") {bearerAuth(token)}
+        response.checkStatus(200);response.body<T>()
+    }
+    private suspend fun HttpResponse.checkStatus(expected:Int) {
+        if(status.value==expected) return
+        val body=runCatching { Json.parseToJsonElement(bodyAsText()).jsonObject }.getOrNull()
+        val code=(body?.get("error") as? JsonPrimitive)?.contentOrNull
+        val fields=(body?.get("fields") as? JsonObject)?.keys.orEmpty()+
+            (body?.get("detail") as? JsonArray).orEmpty().mapNotNull { it.jsonObject["loc"]?.jsonArray?.lastOrNull()?.jsonPrimitive?.contentOrNull }
+        throw SupportApiException(status.value,code,fields,(body?.get("message")?:body?.get("detail"))?.toString() ?: "HTTP ${status.value}")
+    }
+}

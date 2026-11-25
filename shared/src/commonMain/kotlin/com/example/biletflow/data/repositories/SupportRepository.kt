@@ -46,6 +46,8 @@ data class SupportMessageCreate(val body: String, @SerialName("client_request_id
 data class SupportStatusChange(val status: String, @SerialName("expected_status") val expectedStatus: String)
 class SupportApiException(val statusCode: Int, val code: String?, val fields: Set<String>, override val message: String) : Exception(message)
 
+/** Historical proposed contract, retained for legacy thread code/tests only.
+ * App uses SupportCasesRepository and SupportCasesViewModel; no live screen calls these routes. */
 class SupportRepository(private val client: HttpClient, private val requests: SessionOrdersRepository, private val baseUrl: String) {
     suspend fun changeStatus(id: Int, payload: SupportStatusChange): SupportRequest = requests.request { token ->
         val response = client.patch("$baseUrl/support/requests/$id/status") {

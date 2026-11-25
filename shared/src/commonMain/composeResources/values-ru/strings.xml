@@ -443,7 +443,7 @@
     <string name="support_category_other">Другое</string>
     <string name="support_subject">Тема</string>
     <string name="support_message">Первое сообщение</string>
-    <string name="support_subject_error">Введите тему от 3 до 200 символов.</string>
+    <string name="support_subject_error">Введите тему от 1 до 200 символов.</string>
     <string name="support_message_error">Введите сообщение от 1 до 5000 символов.</string>
     <string name="support_send">Отправить обращение</string>
     <string name="support_created">Обращение создано</string>
@@ -517,4 +517,14 @@
     <string name="organizer_order_payment">Номер платежа</string>
     <string name="organizer_order_fee">Комиссия</string>
     <string name="organizer_orders_no_matches">Нет заказов по выбранному статусу и запросу.</string>
+    <string name="support_case_thread_pending">Просмотр обращения без отправки сообщений. Переписка и управление статусами ожидают миграции на новый контракт backend.</string>
+    <string name="support_case_requester">ID заявителя</string>
+    <string name="support_category_technical">Техническая проблема</string>
+    <string name="support_category_refund">Возврат</string>
+    <string name="support_category_checkin">Проверка входа</string>
+    <string name="support_case_author">ID автора</string>
+    <string name="support_category_seating">Места</string>
+    <string name="support_case_unknown">Обращение могло быть создано, но подтверждение не получено. Откройте «Мои обращения» для проверки. Совпадение темы не доказывает создание. Автоматически повторять отправку нельзя.</string>
+    <string name="support_case_category_error">Выберите допустимую категорию обращения.</string>
+    <string name="support_category_account">Аккаунт</string>
 </resources>

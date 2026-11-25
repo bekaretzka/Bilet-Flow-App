@@ -443,7 +443,7 @@
     <string name="support_category_other">Other</string>
     <string name="support_subject">Subject</string>
     <string name="support_message">First message</string>
-    <string name="support_subject_error">Enter a subject of 3–200 characters.</string>
+    <string name="support_subject_error">Enter a subject of 1–200 characters.</string>
     <string name="support_message_error">Enter a message of 1–5000 characters.</string>
     <string name="support_send">Send request</string>
     <string name="support_created">Request created</string>
@@ -517,4 +517,14 @@
     <string name="organizer_order_payment">Payment reference</string>
     <string name="organizer_order_fee">Processing fee</string>
     <string name="organizer_orders_no_matches">No orders match your search and status.</string>
+    <string name="support_case_thread_pending">Read-only case preview. Sending messages and managing statuses are awaiting migration to the new backend contract.</string>
+    <string name="support_case_requester">Requester ID</string>
+    <string name="support_category_technical">Technical issue</string>
+    <string name="support_category_refund">Refund</string>
+    <string name="support_category_checkin">Entry check</string>
+    <string name="support_case_author">Author ID</string>
+    <string name="support_category_seating">Seating</string>
+    <string name="support_case_unknown">The case may have been created, but no confirmation was received. Open My requests to check. A matching subject is not proof of creation. Do not send again automatically.</string>
+    <string name="support_case_category_error">Choose a supported issue category.</string>
+    <string name="support_category_account">Account</string>
 </resources>

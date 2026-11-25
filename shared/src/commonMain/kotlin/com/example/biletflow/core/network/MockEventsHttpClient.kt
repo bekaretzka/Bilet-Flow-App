@@ -217,7 +217,8 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
             if(path == "/auth/me" && email == "suspend-on-me@biletflow.kz" ||
                 path == "/orders/me" && email == "suspend-on-orders@biletflow.kz" ||
                 path.endsWith("/ticket-types/manage") && email == "suspend-on-manage@biletflow.kz" ||
-                path.matches(Regex("/events/\\d+/orders")) && email == "suspend-on-event-orders@biletflow.kz") suspendedOwners.add(authorizationHeader.orEmpty())
+                path.matches(Regex("/events/\\d+/orders")) && email == "suspend-on-event-orders@biletflow.kz" ||
+                path.startsWith("/support/cases") && email == "suspend-on-cases@biletflow.kz") suspendedOwners.add(authorizationHeader.orEmpty())
             if(authorizationHeader in suspendedOwners && (!path.startsWith("/auth/") || path == "/auth/me"))
                 return@MockEngine respondJson("""{"error":"UserSuspendedError","message":"Account suspended","fields":null}""",HttpStatusCode.Forbidden)
         }
