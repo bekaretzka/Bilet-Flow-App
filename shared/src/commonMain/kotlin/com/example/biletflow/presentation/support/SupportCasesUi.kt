@@ -1,6 +1,10 @@
 package com.example.biletflow.presentation.support
 
 import com.example.biletflow.core.designsystem.Card
+import com.example.biletflow.core.designsystem.BF
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.OutlinedButton
 import com.example.biletflow.core.designsystem.Button
@@ -375,7 +379,7 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
             } else state.detail?.let {record ->
                 item {
                     Text("#${record.id} ${record.subject}",style=MaterialTheme.typography.titleLarge)
-                    Text("${stringResource(Res.string.support_case_status)}: ${supportStatusLabel(record.status)}")
+                    com.example.biletflow.core.designsystem.Tag(supportStatusLabel(record.status), when(record.status) { "resolved" -> com.example.biletflow.core.designsystem.Tone.Ok; "waiting_for_customer" -> com.example.biletflow.core.designsystem.Tone.Warn; "in_progress" -> com.example.biletflow.core.designsystem.Tone.Info; else -> com.example.biletflow.core.designsystem.Tone.Brand })
                     CaseContext(record);record.eventId?.let {EventContextCaption(it,eventsRepository)};Text(record.updatedAt)
                     if(state.canManageStatus) {
                         Text(stringResource(Res.string.support_change_status))
@@ -433,16 +437,23 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
                     }
                 }
                 if(record.messages.isEmpty()) item {Text(stringResource(Res.string.support_messages_empty))}
+                // Figma «Зритель / Поддержка (чат)»: my messages on the right in brand/primary, others on the left in white with a border.
                 items(record.messages,key={it.id}) {message ->
-                    Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(12.dp)) {
-                        Text(stringResource(when(supportAuthor(message.authorUserId,record.requesterUserId,state.myId)) {
-                            SupportAuthor.Me -> Res.string.support_author_me
+                    val author=supportAuthor(message.authorUserId,record.requesterUserId,state.myId)
+                    val mine=author==SupportAuthor.Me
+                    Column(Modifier.fillMaxWidth(),horizontalAlignment=if(mine) Alignment.End else Alignment.Start) {
+                        if(!mine) Text(stringResource(when(author) {
                             SupportAuthor.Requester -> Res.string.support_author_requester
                             SupportAuthor.Support -> Res.string.support_author_support
-                            SupportAuthor.Deleted -> Res.string.support_author_deleted
-                        }),style=MaterialTheme.typography.labelLarge)
-                        Text(message.body);Text(message.createdAt,style=MaterialTheme.typography.bodySmall)
-                    }}
+                            else -> Res.string.support_author_deleted
+                        }),style=MaterialTheme.typography.labelMedium,color=BF.ink2,modifier=Modifier.padding(bottom=4.dp))
+                        Surface(Modifier.fillMaxWidth(0.82f).wrapContentWidth(if(mine) Alignment.End else Alignment.Start),
+                            shape=BF.radiusCard,color=if(mine) BF.primary else BF.surface,contentColor=if(mine) BF.onDark else BF.ink,
+                            border=if(mine) null else BorderStroke(1.dp,BF.line)) {
+                            Text(message.body,style=MaterialTheme.typography.bodyLarge,modifier=Modifier.padding(horizontal=14.dp,vertical=10.dp))
+                        }
+                        Text(message.createdAt,style=MaterialTheme.typography.bodySmall,color=BF.muted,modifier=Modifier.padding(top=4.dp))
+                    }
                 }
             }
         }
@@ -451,10 +462,14 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
         if(state.sendUnknown) Text(stringResource(Res.string.support_message_result_unknown),color=MaterialTheme.colorScheme.error)
         state.sendError?.let {Text(stringResource(Res.string.support_send_error)+" "+supportFailureText(it),color=MaterialTheme.colorScheme.error)}
         if(state.invalidDraft) Text(stringResource(Res.string.support_message_error),color=MaterialTheme.colorScheme.error)
-        OutlinedTextField(value=state.draft,onValueChange=vm::updateDraft,enabled=!state.sending,isError=state.invalidDraft,
-            label={Text(stringResource(Res.string.support_compose_message))},modifier=Modifier.fillMaxWidth(),minLines=2,maxLines=5)
-        Button(onClick=vm::send,enabled=!state.sending,modifier=Modifier.fillMaxWidth()) {
-            Text(stringResource(if(state.sending) Res.string.support_sending else Res.string.support_send_message))
+        Row(verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(value=state.draft,onValueChange=vm::updateDraft,enabled=!state.sending,isError=state.invalidDraft,
+                placeholder={Text(stringResource(Res.string.support_compose_message))},modifier=Modifier.weight(1f),minLines=1,maxLines=5,
+                colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=BF.surface,unfocusedContainerColor=BF.surface))
+            Button(onClick=vm::send,enabled=!state.sending,modifier=Modifier.size(56.dp),contentPadding=PaddingValues(0.dp)) {
+                if(state.sending) CircularProgressIndicator(Modifier.size(20.dp),color=BF.onDark,strokeWidth=2.dp)
+                else Text("→",fontSize=22.sp,fontWeight=FontWeight.Bold)
+            }
         }
     }
     }

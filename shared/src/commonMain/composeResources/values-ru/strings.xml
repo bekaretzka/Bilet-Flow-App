@@ -764,4 +764,14 @@
     <string name="ticket_card_type">Билет</string>
     <string name="ticket_card_attendee">Участник</string>
     <string name="ticket_card_hint">Покажите код на входе. Распечатанная и электронная копии — один и тот же билет.</string>
+    <string name="scan_stat_checked">отмечено</string>
+    <string name="scan_stat_total">всего билетов</string>
+    <string name="scan_stat_left">осталось</string>
+    <string name="scan_find_manually">Найти участника вручную</string>
+    <string name="scan_title_pass">Проходите</string>
+    <string name="scan_title_already">Уже отмечен</string>
+    <string name="scan_title_stop">Не пропускать</string>
+    <string name="scan_title_not_ticket">Это не билет</string>
+    <string name="scan_ticket_type">Тип билета</string>
+    <string name="scan_checked_by">Кто отметил</string>
 </resources>

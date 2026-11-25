@@ -1,16 +1,25 @@
 package com.example.biletflow.presentation.organizer
 
-import com.example.biletflow.core.designsystem.TextButton
-import com.example.biletflow.core.designsystem.Button
+import com.example.biletflow.core.designsystem.*
+import com.example.biletflow.presentation.events.formatEventDate
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import biletflow.shared.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
@@ -52,6 +61,10 @@ fun CameraStatusPanel(status: Int, onRequest: () -> Unit, onSettings: () -> Unit
     }
 }
 
+/**
+ * Figma «Сканер / Камера» and the result screens: dark camera with a brand/stub frame and live stats,
+ * then a full-screen verdict: green «Проходите», yellow «Уже отмечен» / «Это не билет», red «Не пропускать».
+ */
 @Composable
 fun QrScannerPage(vm: CheckInOverviewViewModel) {
     val state by vm.state.collectAsState()
@@ -59,32 +72,26 @@ fun QrScannerPage(vm: CheckInOverviewViewModel) {
         vm.scannerForeground(true)
         onPauseOrDispose { vm.scannerForeground(false) }
     }
-    val paused = state.checkingIn || state.checkInResult != null || state.checkInError || state.unknownCode != null || state.verifiedAfterUnknown || state.campaignQr
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TextButton(onClick = vm::closeScanner) { Text(stringResource(Res.string.ticket_create_back)) }
-        Text(state.event?.title.orEmpty(), style = MaterialTheme.typography.titleLarge)
-        if (state.event?.status == "cancelled") Text(stringResource(Res.string.staff_events_cancelled))
-        Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black), contentAlignment = Alignment.Center) {
+    if (state.checkInResult != null || state.campaignQr) { ScanVerdict(vm, state); return }
+    val paused = state.checkingIn || state.checkInError || state.unknownCode != null || state.verifiedAfterUnknown
+    Column(Modifier.fillMaxSize().background(BF.sidebar)) {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = vm::closeScanner, colors = ButtonDefaults.textButtonColors(contentColor = BF.onDark)) { Text("←", fontSize = 22.sp) }
+            Column(Modifier.weight(1f)) {
+                Text(state.event?.title.orEmpty(), color = BF.onDark, fontFamily = HeadingFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (state.event?.status == "cancelled") Text(stringResource(Res.string.staff_events_cancelled), color = BF.stub, fontSize = 13.sp)
+            }
+        }
+        Box(Modifier.weight(1f).fillMaxWidth().background(BF.sidebarSoft), contentAlignment = Alignment.Center) {
             if (state.scannerForeground && !paused) key(state.scannerEpoch) {
                 val epoch = state.scannerEpoch
                 CameraQrPreview(Modifier.fillMaxSize()) { vm.scannerFrame(epoch, it) }
-                Box(Modifier.size(240.dp).border(3.dp, Color.White))
+                Box(Modifier.size(240.dp).border(3.dp, BF.stub, BF.radiusCard))
             }
-            if (paused) Surface(Modifier.fillMaxWidth().padding(12.dp), tonalElevation = 4.dp) {
+            if (paused) Surface(Modifier.fillMaxWidth().padding(16.dp), shape = BF.radiusCard, color = BF.surface, contentColor = BF.ink) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (state.checkingIn) CircularProgressIndicator()
-                    state.checkInResult?.let { result ->
-                        Text(if (result.result == "checked_in") "✓" else "!", style = MaterialTheme.typography.displayMedium,
-                            color = if (result.result == "checked_in") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                        Text(stringResource(checkInResultLabel(result.result)), style = MaterialTheme.typography.titleLarge)
-                        result.ticket?.let { Text("${it.attendeeName.orEmpty()} · ${it.ticketTypeName.orEmpty()} · #${it.id}") }
-                        result.ticket?.takeIf { result.result == "already_checked_in" }?.let { t -> t.checkedInAt?.let { Text(scannedText(it, t.checkedInBy)) } }
-                    }
-                    if (state.campaignQr) {
-                        Text("!", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.error)
-                        Text(stringResource(Res.string.scan_campaign_qr), style = MaterialTheme.typography.titleLarge)
-                    }
-                    if (state.checkInError) Text(stringResource(Res.string.check_action_error))
+                    if (state.checkInError) Text(stringResource(Res.string.check_action_error), color = BF.dangerFg)
                     if (state.unknownCode != null) {
                         Text(stringResource(Res.string.check_action_unknown))
                         Button(onClick = vm::verifyUnknown, enabled = !state.searching) { Text(stringResource(Res.string.payment_check_status)) }
@@ -95,12 +102,80 @@ fun QrScannerPage(vm: CheckInOverviewViewModel) {
                     }
                     if (state.verifiedAfterUnknown) {
                         Text(stringResource(Res.string.check_verified_notice))
-                        state.tickets.forEach { Text("#${it.id} · ${it.status}") }
+                        state.tickets.forEach {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("#${it.id}"); TicketStatusChip(it.status)
+                            }
+                        }
                     }
-                    if (!state.checkingIn && state.unknownCode == null) Button(onClick = vm::nextScannedTicket) { Text(stringResource(Res.string.camera_next)) }
+                    if (!state.checkingIn && state.unknownCode == null)
+                        Button(onClick = vm::nextScannedTicket, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.camera_next)) }
                 }
             }
         }
-        Text(stringResource(Res.string.camera_aim))
+        Column(Modifier.fillMaxWidth().background(BF.sidebar).navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(Res.string.camera_aim), color = BF.onDark.copy(alpha = 0.8f), fontSize = 13.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            state.stats?.let { s ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatTile(s.checkedIn, stringResource(Res.string.scan_stat_checked), Modifier.weight(1f))
+                    StatTile(s.registered, stringResource(Res.string.scan_stat_total), Modifier.weight(1f))
+                    StatTile(s.notCheckedIn, stringResource(Res.string.scan_stat_left), Modifier.weight(1f))
+                }
+            }
+            OutlinedButton(onClick = vm::closeScanner, modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, BF.onDark),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = BF.onDark)) { Text(stringResource(Res.string.scan_find_manually)) }
+        }
     }
+}
+
+@Composable
+private fun StatTile(value: Int, label: String, modifier: Modifier) {
+    Surface(modifier, shape = BF.radiusControl, color = BF.sidebarSoft) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(value.toString(), color = BF.onDark, fontFamily = HeadingFont, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(label, color = BF.onDark.copy(alpha = 0.75f), fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun ScanVerdict(vm: CheckInOverviewViewModel, state: CheckInOverviewState) {
+    val result = state.checkInResult?.result
+    val (tone, icon, title) = when {
+        state.campaignQr -> Triple(Tone.Warn, "!", Res.string.scan_title_not_ticket)
+        result == "checked_in" -> Triple(Tone.Ok, "✓", Res.string.scan_title_pass)
+        result == "already_checked_in" -> Triple(Tone.Warn, "!", Res.string.scan_title_already)
+        else -> Triple(Tone.Danger, "✕", Res.string.scan_title_stop)
+    }
+    val ticket = state.checkInResult?.ticket
+    Column(Modifier.fillMaxSize().background(BF.paper).verticalScroll(rememberScrollState())) {
+        Column(Modifier.fillMaxWidth().background(tone.bg).statusBarsPadding().padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(72.dp).background(tone.fg, CircleShape), contentAlignment = Alignment.Center) {
+                Text(icon, color = BF.onDark, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(stringResource(title), color = tone.fg, fontFamily = HeadingFont, fontWeight = FontWeight.Bold, fontSize = 26.sp, textAlign = TextAlign.Center)
+            Text(stringResource(if (state.campaignQr) Res.string.scan_campaign_qr else checkInResultLabel(result.orEmpty())),
+                color = tone.fg, fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center)
+        }
+        Column(Modifier.navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (ticket != null) SectionCard {
+                VerdictRow(stringResource(Res.string.ticket_card_attendee), ticket.attendeeName.orEmpty())
+                ticket.ticketTypeName?.let { VerdictRow(stringResource(Res.string.scan_ticket_type), it) }
+                VerdictRow(stringResource(Res.string.ticket_card_type), ticket.code)
+                VerdictRow(stringResource(Res.string.ticket_qr_status_label), ticketStatusLabel(ticket.status))
+                ticket.checkedInAt?.let { VerdictRow(stringResource(Res.string.check_checked_at), formatEventDate(it)) }
+                ticket.checkedInBy?.let { VerdictRow(stringResource(Res.string.scan_checked_by), it) }
+            }
+            Button(onClick = vm::nextScannedTicket, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.camera_next)) }
+            OutlinedButton(onClick = vm::closeScanner, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.scan_find_manually)) }
+        }
+    }
+}
+
+@Composable
+private fun VerdictRow(label: String, value: String) = Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Text(label, color = BF.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+    Text(value, color = BF.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
 }

@@ -764,4 +764,14 @@
     <string name="ticket_card_type">Ticket</string>
     <string name="ticket_card_attendee">Attendee</string>
     <string name="ticket_card_hint">Show this code at the entrance. Printed and electronic copies are the same ticket.</string>
+    <string name="scan_stat_checked">checked in</string>
+    <string name="scan_stat_total">total tickets</string>
+    <string name="scan_stat_left">left</string>
+    <string name="scan_find_manually">Find attendee manually</string>
+    <string name="scan_title_pass">Let them in</string>
+    <string name="scan_title_already">Already checked in</string>
+    <string name="scan_title_stop">Do not let in</string>
+    <string name="scan_title_not_ticket">Not a ticket</string>
+    <string name="scan_ticket_type">Ticket type</string>
+    <string name="scan_checked_by">Checked in by</string>
 </resources>
