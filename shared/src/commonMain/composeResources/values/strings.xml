@@ -654,4 +654,9 @@
     <string name="admin_action_failed">The action was not performed</string>
     <string name="admin_result_unknown">The result is unknown. The current state was re-read from the server; check it before trying again.</string>
     <string name="admin_done">Done</string>
+    <string name="admin_approve_organizer">Approve organizer</string>
+    <string name="admin_organizer_status">Organizer profile status</string>
+    <string name="admin_approve_unknown">The result is unknown. Approving again is safe.</string>
+    <string name="admin_no_application">This user has not applied to become an organizer</string>
+    <string name="admin_user_not_found">User not found</string>
 </resources>

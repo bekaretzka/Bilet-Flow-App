@@ -313,3 +313,10 @@ Backend:
 
 - **PATCH /events/{id}: description.** Документ перечисляет очищаемые null поля без description; `EventUpdate` отклоняет null только у title/start_time/end_time/visibility, поэтому `description: null` очищает описание. Клиент отправляет null для очищенного описания.
 - **PATCH /events/{id}: venue опубликованного события.** Документ: «venue on a draft». Код `update_event_service` отказывает, если у published события после изменения пропадает venue_name/venue_address. Клиент отправляет null, а ошибку показывает сервер.
+
+## Расхождения, найденные в шаге 55
+
+Источник: BiletFlow-main/docs/api-reference.md («Platform admin», «Support cases») и backend/routers/admin.py, organizers.py, support.py, services/organizer_service.py, support_service.py, schemas/admin.py, paid_sales.py. При расхождении клиент следует коду.
+
+- **Списка заявок в организаторы нет ни в документе, ни в коде.** В routers/organizers.py только `POST /organizers/apply`, `PATCH /organizers/{user_id}/approve`, `GET /organizers/me` и т. п.; в routers/admin.py нет списка organizer-профилей со статусом pending. `AdminUser` (schemas/admin.py) не содержит статуса организатора, поэтому в `/admin/users` нельзя увидеть, кто подал заявку. Клиент: админ ищет пользователя через `GET /admin/users?q=<email>` и нажимает «Одобрить организатора»; без заявки backend отвечает `404 OrganizerNotFoundError` (repositories/organizer_repository.py), это показывается как «Пользователь не подавал заявку». Предложение: `GET /admin/organizers?status=pending` или поле `organizer_status` в AdminUser.
+- **PATCH /organizers/{user_id}/approve.** Код идемпотентен: уже approved профиль возвращается без изменений (organizer_service.py), документ этого не говорит.

@@ -54,7 +54,7 @@ data class AdminState(
     val items: List<JsonObject> = emptyList(), val total: Int = 0, val loading: Boolean = false, val error: String? = null,
     val csvBusy: Boolean = false, val csv: AdminCsv? = null, val csvError: String? = null, val denied: Boolean = false,
     val selectedId: Int? = null, val busy: Boolean = false, val actionError: AdminFailure? = null, val actionUnknown: Boolean = false,
-    val actionDone: Boolean = false,
+    val actionDone: Boolean = false, val approval: String? = null,
 ) {
     val selected: JsonObject? get() = selectedId?.let { id -> items.firstOrNull { it.id == id } }
 }
@@ -90,7 +90,7 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
         val s = mutable.value
         when {
             s.busy -> Unit
-            s.selectedId != null -> mutable.value = s.copy(selectedId = null, actionError = null, actionUnknown = false, actionDone = false)
+            s.selectedId != null -> mutable.value = s.copy(selectedId = null, actionError = null, actionUnknown = false, actionDone = false, approval = null)
             s.list != null -> { sequence++; mutable.value = AdminState(open = true) }
             else -> close()
         }
@@ -103,7 +103,7 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
         val s = mutable.value
         mutable.value = s.copy(filters = if (value.isNullOrEmpty()) s.filters - key else s.filters + (key to value))
     }
-    fun select(id: Int) { mutable.value = mutable.value.copy(selectedId = id, actionError = null, actionUnknown = false, actionDone = false) }
+    fun select(id: Int) { mutable.value = mutable.value.copy(selectedId = id, actionError = null, actionUnknown = false, actionDone = false, approval = null) }
     fun reload() = load(append = false)
     fun more() { val s = mutable.value; if (!s.loading && s.items.size < s.total) load(append = true) }
 
@@ -234,6 +234,8 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
 internal fun adminFailureText(failure: AdminFailure): String = when {
     failure.code == "PlatformAdminRequiredError" || failure.status == 403 && failure.code == null -> stringResource(Res.string.admin_denied)
     failure.status == 422 || failure.code == "VALIDATION_ERROR" -> stringResource(Res.string.admin_invalid)
+    failure.code == "OrganizerNotFoundError" -> stringResource(Res.string.admin_no_application)
+    failure.code == "UserNotFoundError" -> stringResource(Res.string.admin_user_not_found)
     else -> "${stringResource(Res.string.admin_action_failed)} (${failure.code ?: "HTTP ${failure.status}"})"
 }
 
@@ -323,4 +325,33 @@ private fun AdminRow(list: AdminList, row: JsonObject) {
 @Composable
 private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, row: JsonObject) {
     AdminRow(list, row)
+    val id = row.id ?: return
+    when (list) {
+        AdminList.Users -> {
+            OutlinedButton(onClick = { vm.approveOrganizer(id) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_approve_organizer)) }
+            state.approval?.let { Text("${stringResource(Res.string.admin_organizer_status)}: $it") }
+            if (state.actionUnknown && state.approval == null) Text(stringResource(Res.string.admin_approve_unknown))
+        }
+    }
+}
+
+/** 55.2: there is no list of pending organizer applications in the backend; the admin finds the user by email and approves. */
+fun AdminViewModel.approveOrganizer(userId: Int) {
+    if (state.value.busy) return
+    val expected = generationNow
+    update { it.copy(busy = true, actionError = null, actionUnknown = false, actionDone = false, approval = null) }
+    viewModelScope.launch {
+        try {
+            // path takes the user id, not the organizer profile id; approving an approved profile is a no-op on the server
+            val result = call(HttpMethod.Patch, "/organizers/$userId/approve")
+            if (expected != generationNow) return@launch
+            val ok = (result["user_id"] as? JsonPrimitive)?.intOrNull == userId
+            update { it.copy(busy = false, actionDone = ok, actionUnknown = !ok, approval = result.text("status")) }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            if (expected != generationNow) return@launch
+            val failure = failure(error)
+            update { it.copy(busy = false, actionError = failure, actionUnknown = failure == null, denied = isDenied(error)) }
+        }
+    }
 }

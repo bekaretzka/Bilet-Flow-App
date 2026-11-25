@@ -654,4 +654,9 @@
     <string name="admin_action_failed">Действие не выполнено</string>
     <string name="admin_result_unknown">Результат неизвестен. Текущее состояние перечитано с сервера; проверьте его перед повтором.</string>
     <string name="admin_done">Готово</string>
+    <string name="admin_approve_organizer">Одобрить организатора</string>
+    <string name="admin_organizer_status">Статус профиля организатора</string>
+    <string name="admin_approve_unknown">Результат неизвестен. Повторное одобрение безопасно.</string>
+    <string name="admin_no_application">Пользователь не подавал заявку в организаторы</string>
+    <string name="admin_user_not_found">Пользователь не найден</string>
 </resources>
