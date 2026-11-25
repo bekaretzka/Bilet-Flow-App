@@ -111,6 +111,7 @@ fun OrderResultPage(
                     Spacer(Modifier.height(14.dp))
                     ResultRow(stringResource(Res.string.order_result_status), statusText)
                     Spacer(Modifier.height(14.dp))
+                    if (order.discountAmount > 0) ResultRow("${stringResource(Res.string.order_discount)}${order.promoCode?.let { " ($it)" }.orEmpty()}", "−" + formatOrderPrice(order.discountAmount))
                     ResultRow(stringResource(Res.string.order_result_total), formatOrderPrice(order.totalAmount))
                     if (!confirmed && order.expiresAt != null) {
                         Spacer(Modifier.height(14.dp))

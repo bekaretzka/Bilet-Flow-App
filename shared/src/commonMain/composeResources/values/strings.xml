@@ -557,4 +557,17 @@
     <string name="sales_discounts">Discounts</string>
     <string name="sales_refunded">Refunded</string>
     <string name="sales_checked_in">Checked in</string>
+    <string name="order_attendees_help">Name on each ticket (optional). Empty names use the buyer name.</string>
+    <string name="order_attendee_name">attendee</string>
+    <string name="order_promo_code">Promo code</string>
+    <string name="order_promo_apply">Apply</string>
+    <string name="order_subtotal">Subtotal</string>
+    <string name="order_discount">Discount</string>
+    <string name="order_server_total">Total to pay</string>
+    <string name="order_free_after_discount">The discount covers the whole price: the order is confirmed at once, no payment step.</string>
+    <string name="order_preview_stale">Quantities or code changed. Press Apply again to see prices.</string>
+    <string name="promo_not_found">Promo code not found for this event.</string>
+    <string name="promo_not_active">This promo code is not active now.</string>
+    <string name="promo_used_up">This promo code has been used up.</string>
+    <string name="promo_not_applicable">This promo code does not apply to the selected tickets.</string>
 </resources>

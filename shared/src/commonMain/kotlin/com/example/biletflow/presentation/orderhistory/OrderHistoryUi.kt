@@ -138,6 +138,7 @@ private fun OrderHistoryCard(
             Spacer(Modifier.height(7.dp))
             HistoryRow(stringResource(Res.string.order_result_status), orderStatus(order.status))
             Spacer(Modifier.height(7.dp))
+            if (order.discountAmount > 0) HistoryRow("${stringResource(Res.string.order_discount)}${order.promoCode?.let { " ($it)" }.orEmpty()}", "−" + historyPrice(order.discountAmount), false)
             HistoryRow(stringResource(Res.string.order_result_total), historyPrice(order.totalAmount), true)
         }
     }

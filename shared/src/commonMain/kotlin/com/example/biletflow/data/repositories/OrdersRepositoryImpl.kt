@@ -4,7 +4,7 @@ import com.example.biletflow.core.network.apiBaseUrl
 import com.example.biletflow.core.network.createHttpClient
 import com.example.biletflow.domain.models.CreateOrderItem
 import com.example.biletflow.domain.models.CreateOrderRequest
-import com.example.biletflow.domain.models.Order
+import com.example.biletflow.domain.models.*
 import com.example.biletflow.domain.repositories.OrdersRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -37,15 +37,27 @@ class OrdersRepositoryImpl(
         buyerName: String,
         items: List<CreateOrderItem>,
         accessToken: String,
+        promoCode: String?,
     ): Order {
         val response = client.post("$baseUrl/events/$eventId/orders") {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
-            setBody(CreateOrderRequest(buyerName = buyerName, items = items))
+            setBody(CreateOrderRequest(buyerName = buyerName, items = items, promoCode = promoCode))
         }
         if (response.status.value == 201) return response.body()
 
         return response.asOrderOrThrow(expectedStatus = 201)
+    }
+
+    override suspend fun previewOrder(eventId: Int, items: List<CreateOrderItem>, promoCode: String?, accessToken: String): OrderPreview {
+        val response = client.post("$baseUrl/events/$eventId/orders/preview") {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(OrderPreviewRequest(items.map { PreviewOrderItem(it.ticketTypeId, it.quantity) }, promoCode))
+        }
+        if (response.status.value == 200) return response.body()
+        response.asOrderOrThrow(expectedStatus = 200)
+        error("Unreachable")
     }
 
     override suspend fun payOrder(orderId: Int, accessToken: String): Order {

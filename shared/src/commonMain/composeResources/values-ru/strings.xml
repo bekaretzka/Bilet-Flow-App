@@ -557,4 +557,17 @@
     <string name="sales_discounts">Скидки</string>
     <string name="sales_refunded">Возвращено</string>
     <string name="sales_checked_in">Прошли вход</string>
+    <string name="order_attendees_help">Имя на каждом билете (необязательно). Пустые имена заменяются именем покупателя.</string>
+    <string name="order_attendee_name">участник</string>
+    <string name="order_promo_code">Промокод</string>
+    <string name="order_promo_apply">Применить</string>
+    <string name="order_subtotal">Сумма</string>
+    <string name="order_discount">Скидка</string>
+    <string name="order_server_total">К оплате</string>
+    <string name="order_free_after_discount">Скидка покрывает всю сумму: заказ подтверждается сразу, без оплаты.</string>
+    <string name="order_preview_stale">Количество или код изменились. Нажмите «Применить» ещё раз.</string>
+    <string name="promo_not_found">Промокод не найден для этого мероприятия.</string>
+    <string name="promo_not_active">Промокод сейчас не действует.</string>
+    <string name="promo_used_up">Лимит использований промокода исчерпан.</string>
+    <string name="promo_not_applicable">Промокод не подходит к выбранным билетам.</string>
 </resources>

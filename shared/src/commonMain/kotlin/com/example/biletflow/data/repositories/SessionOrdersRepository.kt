@@ -103,6 +103,8 @@ class SessionOrdersRepository(
     override suspend fun payOrder(orderId: Int, accessToken: String) = request { delegate.payOrder(orderId, it) }
     override suspend fun cancelOrder(orderId: Int, accessToken: String) = request { delegate.cancelOrder(orderId, it) }
     override suspend fun refundOrder(orderId: Int, reason: String, accessToken: String) = request { delegate.refundOrder(orderId, reason, it) }
-    override suspend fun createOrder(eventId: Int, buyerName: String, items: List<CreateOrderItem>, accessToken: String) =
-        request { delegate.createOrder(eventId, buyerName, items, it) }
+    override suspend fun createOrder(eventId: Int, buyerName: String, items: List<CreateOrderItem>, accessToken: String, promoCode: String?) =
+        request { delegate.createOrder(eventId, buyerName, items, it, promoCode) }
+    override suspend fun previewOrder(eventId: Int, items: List<CreateOrderItem>, promoCode: String?, accessToken: String) =
+        request { delegate.previewOrder(eventId, items, promoCode, it) }
 }

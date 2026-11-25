@@ -7,13 +7,25 @@ import kotlinx.serialization.Serializable
 data class CreateOrderItem(
     @SerialName("ticket_type_id") val ticketTypeId: Int,
     val quantity: Int,
+    /** One per ticket; blank entries are replaced with buyer_name before sending. */
+    @SerialName("attendee_names") val attendeeNames: List<String>? = null,
 )
 
 @Serializable
 data class CreateOrderRequest(
     @SerialName("buyer_name") val buyerName: String,
     val items: List<CreateOrderItem>,
+    @SerialName("promo_code") val promoCode: String? = null,
 )
+
+@Serializable
+data class PreviewOrderItem(@SerialName("ticket_type_id") val ticketTypeId: Int, val quantity: Int)
+
+@Serializable
+data class OrderPreviewRequest(val items: List<PreviewOrderItem>, @SerialName("promo_code") val promoCode: String? = null)
+
+@Serializable
+data class OrderPreview(val subtotal: Long, val discount: Long, val total: Long, @SerialName("promo_code") val promoCode: String? = null)
 
 @Serializable
 data class OrderItem(
@@ -41,6 +53,8 @@ data class Order(
     @SerialName("event_id") val eventId: Int,
     val status: String,
     @SerialName("total_amount") val totalAmount: Long,
+    @SerialName("discount_amount") val discountAmount: Long = 0,
+    @SerialName("promo_code") val promoCode: String? = null,
     @SerialName("buyer_name") val buyerName: String,
     @SerialName("buyer_email") val buyerEmail: String,
     @SerialName("created_at") val createdAt: String,

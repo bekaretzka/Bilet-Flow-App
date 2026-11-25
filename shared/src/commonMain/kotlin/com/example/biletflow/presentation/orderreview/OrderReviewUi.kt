@@ -146,6 +146,49 @@ fun OrderReviewPage(
                         } else null,
                         isError = orderState.error == OrderCreationError.InvalidName,
                     )
+                    val editable = !orderState.isSubmitting && orderState.createdOrder == null
+                    Spacer(Modifier.height(12.dp))
+                    Text(stringResource(Res.string.order_attendees_help), color = Muted, fontSize = 14.sp)
+                    selectedItems.forEach { item ->
+                        repeat(item.quantity) { index ->
+                            OutlinedTextField(
+                                value = orderState.attendeeNames[item.ticketType.id]?.getOrNull(index).orEmpty(),
+                                onValueChange = { orderViewModel.updateAttendeeName(item.ticketType.id, index, it) },
+                                modifier = Modifier.fillMaxWidth(), enabled = editable, singleLine = true,
+                                label = { Text("${item.ticketType.name} · ${stringResource(Res.string.order_attendee_name)} ${index + 1}") },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = orderState.promoCode,
+                            onValueChange = orderViewModel::updatePromoCode,
+                            modifier = Modifier.weight(1f), enabled = editable, singleLine = true,
+                            label = { Text(stringResource(Res.string.order_promo_code)) },
+                            isError = orderState.promoError != null,
+                        )
+                        TextButton(
+                            onClick = { event?.let { orderViewModel.applyPromo(it.id, requestItems) } },
+                            enabled = editable && !orderState.previewing && requestItems.isNotEmpty(),
+                        ) { Text(stringResource(Res.string.order_promo_apply), color = Purple) }
+                    }
+                    if (orderState.previewing) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
+                    orderState.promoError?.let { code ->
+                        Text(when (code) {
+                            "PromoCodeNotFoundError" -> stringResource(Res.string.promo_not_found)
+                            "PromoCodeNotActiveError" -> stringResource(Res.string.promo_not_active)
+                            "PromoCodeUsedUpError" -> stringResource(Res.string.promo_used_up)
+                            "PromoCodeNotApplicableError" -> stringResource(Res.string.promo_not_applicable)
+                            else -> "${stringResource(Res.string.order_error_server)} ($code)"
+                        }, color = Color(0xFFB3261E), fontSize = 14.sp)
+                    }
+                    if (orderState.previewValid(requestItems)) orderState.preview?.let { preview ->
+                        Text("${stringResource(Res.string.order_subtotal)}: ${preview.subtotal} ₸", color = Ink)
+                        Text("${stringResource(Res.string.order_discount)}: −${preview.discount} ₸", color = Ink)
+                        Text("${stringResource(Res.string.order_server_total)}: ${preview.total} ₸", color = Ink, fontWeight = FontWeight.Bold)
+                        if (preview.total == 0L) Text(stringResource(Res.string.order_free_after_discount), color = Muted, fontSize = 14.sp)
+                    } else if (orderState.preview != null) Text(stringResource(Res.string.order_preview_stale), color = Muted, fontSize = 14.sp)
                     OrderError(
                         error = orderState.error,
                         conflictCode = orderState.conflictCode,
@@ -203,7 +246,7 @@ private fun OrderError(
         }
         OrderCreationError.UnknownResult -> stringResource(Res.string.order_error_unknown_result)
         OrderCreationError.Server -> stringResource(Res.string.order_error_server)
-        OrderCreationError.InvalidName -> return
+        OrderCreationError.InvalidName, OrderCreationError.Promo -> return
     }
     Text(text, color = Color(0xFFB3261E), fontSize = 14.sp, lineHeight = 20.sp)
     if (error == OrderCreationError.Unauthorized || error == OrderCreationError.Conflict) {
