@@ -91,7 +91,7 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
         val payload = buildJsonObject {
             (eventTextFields + eventDateFields + "visibility").forEach { key ->
                 val value = current.values[key].orEmpty().trim()
-                if (current.editingId != null && value == current.original[key]) return@forEach
+                if (current.editingId != null && value == current.original[key]?.trim()) return@forEach
                 if (current.editingId != null && value.isEmpty()) { put(key, JsonNull); return@forEach }
                 if (value.isNotEmpty()) {
                     if (key == "capacity") put(key, value.toInt()) else put(key, value)

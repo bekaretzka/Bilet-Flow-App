@@ -554,4 +554,7 @@
     <string name="campaigns_edit_unknown">The change may have been saved. Check the current state before editing again.</string>
     <string name="campaigns_check_state">Check current state</string>
     <string name="campaigns_code_exists">This code is already used at this event.</string>
+    <string name="sales_discounts">Discounts</string>
+    <string name="sales_refunded">Refunded</string>
+    <string name="sales_checked_in">Checked in</string>
 </resources>

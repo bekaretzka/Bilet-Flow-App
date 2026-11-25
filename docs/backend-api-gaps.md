@@ -306,3 +306,10 @@ Backend:
 - **Оплата после unpublish.** pay_order_service не проверяет published/visibility и окно регистрации заново: pending, срок резерва, active paid sales, отсутствие event suspension. Поэтому публичный 404 сам по себе не запрещает оплату существующего заказа. QR владельца также не зависит от публичной страницы; check-in решает endpoint и server result. После cancel backend отменяет pending/free confirmed и возвращает paid confirmed. Клиент обновляет основной заказ через его endpoint.
 
 Принятое поведение MockEngine и клиента описано в README 52G. Настройки local/staging не меняются. Предложения кампаний/промокодов/PDF/журнала остаются отдельными блоками миграции.
+
+## Расхождения, найденные в шаге 53
+
+Источник: BiletFlow-main/docs/api-reference.md (25.11.2026) и backend/routers, schemas, services. При расхождении клиент следует коду.
+
+- **PATCH /events/{id}: description.** Документ перечисляет очищаемые null поля без description; `EventUpdate` отклоняет null только у title/start_time/end_time/visibility, поэтому `description: null` очищает описание. Клиент отправляет null для очищенного описания.
+- **PATCH /events/{id}: venue опубликованного события.** Документ: «venue on a draft». Код `update_event_service` отказывает, если у published события после изменения пропадает venue_name/venue_address. Клиент отправляет null, а ошибку показывает сервер.

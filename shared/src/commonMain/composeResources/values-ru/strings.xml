@@ -554,4 +554,7 @@
     <string name="campaigns_edit_unknown">Изменение могло сохраниться. Проверьте текущее состояние перед новым изменением.</string>
     <string name="campaigns_check_state">Проверить текущее состояние</string>
     <string name="campaigns_code_exists">Такой код уже есть в этом мероприятии.</string>
+    <string name="sales_discounts">Скидки</string>
+    <string name="sales_refunded">Возвращено</string>
+    <string name="sales_checked_in">Прошли вход</string>
 </resources>

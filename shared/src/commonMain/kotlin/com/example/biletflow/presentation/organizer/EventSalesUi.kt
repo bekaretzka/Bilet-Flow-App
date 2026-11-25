@@ -31,6 +31,7 @@ data class EventSales(
     @SerialName("gross_sales") val grossSales: Long,
     @SerialName("processing_fees") val processingFees: Long,
     val refunds: Long,
+    val discounts: Long = 0,
     @SerialName("estimated_payout") val estimatedPayout: Long,
     @SerialName("paid_orders") val paidOrders: Int,
     @SerialName("ticket_types") val ticketTypes: List<TicketTypeSales>,
@@ -41,6 +42,7 @@ data class TicketTypeSales(
     @SerialName("ticket_type_id") val ticketTypeId: Int,
     val name: String, val price: Long, val quantity: Int,
     val sold: Int, val reserved: Int, val available: Int,
+    val refunded: Int = 0, @SerialName("checked_in") val checkedIn: Int = 0,
 )
 
 data class EventSalesState(
@@ -117,6 +119,7 @@ fun EventSalesPage(vm: EventSalesViewModel) {
                     Res.string.sales_gross to "${sales.grossSales} $currency",
                     Res.string.sales_fees to "${sales.processingFees} $currency",
                     Res.string.sales_refunds to "${sales.refunds} $currency",
+                    Res.string.sales_discounts to "${sales.discounts} $currency",
                     Res.string.sales_payout to "${sales.estimatedPayout} $currency",
                 )
                 metrics.forEach { (label, value) -> item {
@@ -137,6 +140,7 @@ fun EventSalesPage(vm: EventSalesViewModel) {
                             Text("${stringResource(Res.string.sales_quantity)}: ${type.quantity}")
                             Text("${stringResource(Res.string.sales_sold)}: ${type.sold} · ${stringResource(Res.string.sales_reserved)}: ${type.reserved}")
                             Text("${stringResource(Res.string.sales_available)}: ${type.available}")
+                            Text("${stringResource(Res.string.sales_refunded)}: ${type.refunded} · ${stringResource(Res.string.sales_checked_in)}: ${type.checkedIn}")
                         }
                     }
                 }
