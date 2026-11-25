@@ -8,10 +8,11 @@ import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
 actual fun createHttpClient(): HttpClient = HttpClient(Darwin) {
+    installSessionErrorValidation()
     install(HttpTimeout) {
-        requestTimeoutMillis = 15_000
+        requestTimeoutMillis = 75_000
         connectTimeoutMillis = 10_000
-        socketTimeoutMillis = 15_000
+        socketTimeoutMillis = 75_000
     }
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })

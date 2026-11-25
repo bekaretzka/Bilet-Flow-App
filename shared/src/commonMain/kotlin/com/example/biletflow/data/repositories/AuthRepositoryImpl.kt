@@ -32,6 +32,7 @@ private data class RegisteredUser(val id: Int, val email: String)
 class AuthApiException(
     val statusCode: Int,
     override val message: String,
+    val errorCode: String? = null,
 ) : Exception(message)
 
 class AuthRepositoryImpl(
@@ -82,6 +83,7 @@ class AuthRepositoryImpl(
     private fun apiException(statusCode: Int, body: String) = AuthApiException(
         statusCode = statusCode,
         message = parseErrorMessage(body) ?: "Request failed ($statusCode)",
+        errorCode = runCatching { json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.contentOrNull }.getOrNull(),
     )
 
     private fun parseErrorMessage(body: String): String? {

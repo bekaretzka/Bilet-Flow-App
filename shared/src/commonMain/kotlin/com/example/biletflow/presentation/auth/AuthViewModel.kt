@@ -18,7 +18,7 @@ enum class AuthValidationError {
     PasswordMismatch,
 }
 
-enum class AuthRequestError { InvalidCredentials, Network, ExistingEmail, Fields, Server }
+enum class AuthRequestError { InvalidCredentials, Suspended, Network, ExistingEmail, Fields, Server }
 
 data class AuthFormState(
     val email: String = "",
@@ -73,18 +73,22 @@ class AuthViewModel(
         if (_state.value.isLoading) return
         validateLogin()?.let { setValidationError(it); return }
         val form = _form.value
+        val expectedGeneration = sessionStore.generation
         if (_state.value.isLoading) return
         _state.value = AuthUiState(isLoading = true)
         viewModelScope.launch {
             runCatching { repository.login(form.email.trim().lowercase(), form.password) }
                 .onSuccess { tokens ->
+                    if(expectedGeneration != sessionStore.generation) return@onSuccess
                     sessionStore.save(tokens.copy(email = form.email.trim().lowercase()))
                     _form.value = _form.value.copy(password = "")
                     _state.value = AuthUiState(isSuccess = true)
                 }
                 .onFailure { error ->
+                    if(expectedGeneration != sessionStore.generation || error is kotlinx.coroutines.CancellationException) return@onFailure
+                    if(error is AuthApiException && error.errorCode == "UserSuspendedError") sessionStore.suspendSession(expectedGeneration)
                     _state.value = AuthUiState(
-                        requestError = if (error is AuthApiException && error.statusCode == 401) {
+                        requestError = if(error is AuthApiException && error.errorCode == "UserSuspendedError") AuthRequestError.Suspended else if (error is AuthApiException && error.statusCode == 401) {
                             AuthRequestError.InvalidCredentials
                         } else {
                             AuthRequestError.Network
@@ -132,6 +136,7 @@ class AuthViewModel(
         clearRequestState()
     }
 
+    fun resetForSessionEnd() { _form.value = AuthFormState(); _state.value = AuthUiState(); _page.value = AuthPage.Login }
     fun clearState() {
         _state.value = AuthUiState()
     }

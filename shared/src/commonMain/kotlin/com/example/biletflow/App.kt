@@ -62,7 +62,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         val catalogScroll = rememberScrollState()
 
         val apiClient = remember(useMockEvents) {
-            if (useMockEvents) createMockEventsHttpClient(visitorCheckoutReady = true) else createHttpClient()
+            if (useMockEvents) createMockEventsHttpClient(visitorCheckoutReady = true, catalogPageFixtures = true) else createHttpClient()
         }
         val eventsRepository = remember(apiClient) { EventsRepositoryImpl(client = apiClient) }
         val authRepository = remember(apiClient) { AuthRepositoryImpl(client = apiClient) }
@@ -88,15 +88,22 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             SessionOrdersRepository(OrdersRepositoryImpl(client = apiClient), authRepository, sessionStore, sessionScope)
         }
         val session by sessionStore.tokens.collectAsState()
+        val currentUserVm: com.example.biletflow.presentation.auth.CurrentUserViewModel = viewModel {
+            com.example.biletflow.presentation.auth.CurrentUserViewModel(apiClient,ordersRepository,sessionStore)
+        }
+        val currentUserState by currentUserVm.state.collectAsState()
+        val currentUser by sessionStore.user.collectAsState()
+        val suspended by sessionStore.suspended.collectAsState()
         val supportVm: SupportViewModel = viewModel { SupportViewModel(apiClient, ordersRepository, sessionStore) }
         val supportState by supportVm.state.collectAsState()
-        val supportHistoryVm: SupportHistoryViewModel = viewModel { SupportHistoryViewModel(apiClient, ordersRepository, sessionStore) }
+        val supportHistoryVm: SupportCasesViewModel = viewModel { SupportCasesViewModel(apiClient, ordersRepository, sessionStore) }
         val supportHistoryState by supportHistoryVm.state.collectAsState()
 
         val eventsViewModel: EventsViewModel = viewModel {
             EventsViewModel(eventsRepository)
         }
         val eventsState by eventsViewModel.state.collectAsState()
+        LaunchedEffect(eventsState.filterRevision) { if(eventsState.filterRevision > 0) catalogScroll.scrollTo(0) }
         val eventDetailsViewModel: EventDetailsViewModel = viewModel {
             EventDetailsViewModel(eventsRepository)
         }
@@ -117,7 +124,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             OrderHistoryViewModel(ordersRepository, sessionStore)
         }
         val orderHistoryState by orderHistoryViewModel.state.collectAsState()
-        val organizerVm: OrganizerViewModel = viewModel { OrganizerViewModel(apiClient, ordersRepository, sessionStore) }
+        val organizerVm: OrganizerViewModel = viewModel { OrganizerViewModel(apiClient, ordersRepository, sessionStore, onApplied = currentUserVm::refreshAfterChange) }
         val organizerState by organizerVm.state.collectAsState()
         val myEventsVm: MyEventsViewModel = viewModel { MyEventsViewModel(apiClient, ordersRepository, sessionStore) }
         val myEventsState by myEventsVm.state.collectAsState()
@@ -131,6 +138,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         val salesState by salesVm.state.collectAsState()
         val organizerOrdersVm: OrganizerOrdersViewModel = viewModel { OrganizerOrdersViewModel(apiClient, ordersRepository, sessionStore) }
         val organizerOrdersState by organizerOrdersVm.state.collectAsState()
+        val campaignsVm: CampaignsViewModel = viewModel { CampaignsViewModel(apiClient,ordersRepository,sessionStore) }
+        val campaignsState by campaignsVm.state.collectAsState()
+        LaunchedEffect(campaignsState.denied) {
+            if(campaignsState.denied) { campaignsVm.close(); myEventsVm.close(); organizerVm.load() }
+        }
         LaunchedEffect(organizerOrdersState.denied) {
             if (organizerOrdersState.denied) { organizerOrdersVm.close(); myEventsVm.close(); organizerVm.load() }
         }
@@ -181,12 +193,12 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             if (myEventsState.accessDenied) { myEventsVm.close(); organizerVm.load() }
         }
         LaunchedEffect(selectedTab, session?.email, session != null) {
-            if (selectedTab == 2 && session != null) organizerVm.load()
+            if (selectedTab == 2 && session != null) currentUserVm.load()
         }
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
             if (checkInVm.state.value.event != null && sessionStore.tokens.value != null) checkInVm.reloadStats()
             if (staffEventsVm.state.value.open && sessionStore.tokens.value != null) staffEventsVm.reload()
-            if (selectedTab == 2 && sessionStore.tokens.value != null) organizerVm.load()
+            if (sessionStore.tokens.value != null) currentUserVm.load()
         }
         var previousAccount by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(session?.email) {
@@ -210,6 +222,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
 
         val logout = {
+            campaignsVm.close()
             supportHistoryVm.close()
             supportVm.close()
             previousAccount = null
@@ -229,8 +242,24 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             orderOpenedFromHistory = false
             selectedTab = 0
         }
-        val isRoot = !supportHistoryState.open && supportState.eventId == null && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
+        LaunchedEffect(suspended) {
+            if(suspended) {
+                campaignsVm.close(); supportHistoryVm.close(); supportVm.close()
+                orderHistoryViewModel.close(); orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
+                eventDetailsViewModel.clearSelection(); organizerOrdersVm.close(); salesVm.close(); attendeesVm.close()
+                staffVm.close(); staffEventsVm.close(); checkInVm.close(); paidSalesVm.close(); myEventsVm.close()
+                createEventVm.reset(); ticketCreateVm.close(); organizerVm.closeForm(); authViewModel.resetForSessionEnd()
+                completedOrder=null; selectedTicketId=null; selectedEventId=null; showOrderReview=false
+                showOrderHistory=false; showLogin=false; loginForHistory=false; orderOpenedFromHistory=false
+                previousAccount=null; selectedTab=0
+            }
+        }
+        if(suspended) AlertDialog(onDismissRequest=sessionStore::dismissSuspended,
+            text={ Text(stringResource(Res.string.session_suspended)) },
+            confirmButton={ TextButton(onClick=sessionStore::dismissSuspended) { Text("OK") } })
+        val isRoot = campaignsState.eventId == null && !supportHistoryState.open && supportState.eventId == null && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
+            campaignsState.eventId != null && !showLogin -> ({ campaignsVm.back() })
             supportHistoryState.open && !showLogin -> ({ supportHistoryVm.back() })
             supportState.eventId != null && !showLogin -> ({ if (!supportState.sending) supportVm.close() })
             organizerOrdersState.eventId != null && !showLogin -> ({ organizerOrdersVm.back() })
@@ -283,12 +312,18 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
 
         Column(Modifier.fillMaxSize()) {
+        if(session != null && currentUserState.error != null) {
+            Text(stringResource(Res.string.current_user_error))
+            Text(currentUserState.error.orEmpty())
+            TextButton(onClick=currentUserVm::load) { Text(stringResource(Res.string.events_retry)) }
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
-            supportHistoryState.open && !showLogin -> SupportHistoryPage(supportHistoryVm, session != null) {
+            campaignsState.eventId != null && !showLogin -> CampaignsPage(campaignsVm)
+            supportHistoryState.open && !showLogin -> SupportCasesPage(supportHistoryVm, session != null) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
             }
-            supportState.eventId != null && !showLogin -> SupportPage(supportVm, session != null, onOpenRequest = { supportHistoryVm.select(it, fromCreation = true) }) {
+            supportState.eventId != null && !showLogin -> SupportPage(supportVm, session != null, onOpenRequest = { supportHistoryVm.select(it, fromCreation = true) }, onCheckCases = { supportHistoryVm.open() }) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
             }
             organizerOrdersState.eventId != null && !showLogin -> OrganizerOrdersPage(organizerOrdersVm)
@@ -306,7 +341,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             myEventsState.selectedId != null && !showLogin -> EventManagementPage(myEventsVm, createEventVm::edit, ticketCreateVm,
                 onPaidSales = { paidSalesVm.open(it.id, it.title) }, onAttendees = { attendeesVm.open(it.id, it.title) },
                 onStaff = { staffVm.open(it.id, it.title) }, onSales = { salesVm.open(it.id, it.title) }, onCopy = createEventVm::copySettings,
-                onOrders = { organizerOrdersVm.open(it.id, it.title) })
+                onOrders = { organizerOrdersVm.open(it.id, it.title) }, onSupport = { supportHistoryVm.openEvent(it.id,it.title) }, onCampaigns = { campaignsVm.open(it.id,it.title) })
             myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open)
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(
@@ -386,7 +421,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Text(stringResource(Res.string.nav_profile), style = MaterialTheme.typography.headlineLarge)
-                Text(session?.email ?: stringResource(
+                Text(currentUser?.email ?: stringResource(
                     if (session == null) Res.string.profile_guest else Res.string.profile_signed_in,
                 ))
                 TextButton(onClick = supportHistoryVm::open) { Text(stringResource(Res.string.support_history)) }
@@ -394,9 +429,22 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                     loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
                 }) { Text(stringResource(Res.string.auth_login_button)) }
                 else Button(onClick = logout) { Text(stringResource(Res.string.auth_logout)) }
-                if (session != null) OrganizerContent(organizerVm) { showLogin = true }
-                if (session != null) Button(onClick = staffEventsVm::open) { Text(stringResource(Res.string.staff_events_title)) }
-                if (session != null && organizerState.profile?.status == "approved") {
+                if(session != null) {
+                    if(currentUserState.loading) CircularProgressIndicator()
+                    currentUser?.let { user ->
+                        Text("ID: ${user.id}")
+                        Text(stringResource(if(user.emailVerified) Res.string.profile_email_verified else Res.string.profile_email_unverified))
+                        if(user.isPlatformAdmin) Text(stringResource(Res.string.profile_admin))
+                        when(user.organizer?.status) {
+                            "pending" -> Text(stringResource(Res.string.organizer_pending))
+                            "approved" -> Text(stringResource(Res.string.organizer_approved))
+                            null -> Button(onClick=organizerVm::openForm) { Text(stringResource(Res.string.organizer_apply)) }
+                        }
+                        TextButton(onClick=currentUserVm::load) { Text(stringResource(Res.string.organizer_refresh)) }
+                    }
+                }
+                if (session != null && currentUser?.canScan == true) Button(onClick = staffEventsVm::open) { Text(stringResource(Res.string.staff_events_title)) }
+                if (session != null && currentUser?.organizer?.status == "approved") {
                     Button(onClick = myEventsVm::open) { Text(stringResource(Res.string.my_events_title)) }
                 }
             }
@@ -507,3 +555,6 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
     }
 }
+
+@Composable
+fun NetworkConfigurationError(message: String) { MaterialTheme { Text(message, modifier = Modifier.fillMaxSize().statusBarsPadding().padding(24.dp)) } }

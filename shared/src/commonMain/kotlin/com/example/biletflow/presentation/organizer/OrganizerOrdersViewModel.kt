@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.*
 
 data class OrganizerOrdersState(
     val eventId: Int? = null, val title: String = "", val orders: List<OrganizerOrder> = emptyList(),
-    val loading: Boolean = false, val nextCursor: String? = null, val error: String? = null,
+    val loading: Boolean = false, val nextOffset: Int = 0, val total: Int = 0, val error: String? = null,
+    val query: String = "", val status: String? = null,
     val selectedId: Int? = null, val order: OrganizerOrder? = null, val detailLoading: Boolean = false,
     val detailError: String? = null, val denied: Boolean = false,
     val confirming: Boolean = false, val reason: String = "", val invalidReason: Boolean = false,
@@ -28,14 +29,14 @@ class OrganizerOrdersViewModel(client: HttpClient, requests: SessionOrdersReposi
     private var epoch = 0
     private var listSequence = 0
     private var detailSequence = 0
-    private val cursors = mutableSetOf<String>()
+    private var listJob: Job? = null
     init { viewModelScope.launch { session.tokens.collect {
         if (generation != session.generation) { generation = session.generation; close() }
     } } }
     fun open(eventId: Int, title: String) {
         close(); mutable.value = OrganizerOrdersState(eventId = eventId, title = title); reload()
     }
-    fun close() { epoch++; listSequence++; detailSequence++; cursors.clear(); mutable.value = OrganizerOrdersState() }
+    fun close() { epoch++; listSequence++; detailSequence++; listJob?.cancel(); mutable.value = OrganizerOrdersState() }
     fun back() {
         if (mutable.value.refundBusy) return
         if (mutable.value.confirming) { dismissRefund(); return }
@@ -52,23 +53,29 @@ class OrganizerOrdersViewModel(client: HttpClient, requests: SessionOrdersReposi
     } == true
     fun reload() = loadPage(false)
     fun more() = loadPage(true)
+    fun search(value: String) = filter(value, mutable.value.status)
+    fun status(value: String?) = filter(mutable.value.query, value)
+    private fun filter(query: String, status: String?) {
+        if(mutable.value.refundBusy) return
+        listJob?.cancel(); listSequence++
+        mutable.value=mutable.value.copy(query=query,status=status,loading=false,orders=emptyList(),nextOffset=0,total=0)
+        loadPage(false)
+    }
     private fun loadPage(append: Boolean) {
         val current = mutable.value
         val eventId = current.eventId ?: return
         if (current.loading || current.refundBusy) return
-        val cursor = if (append) current.nextCursor ?: return else null
+        val offset = if (append) current.nextOffset.takeIf { it < current.total } ?: return else 0
         val expected = session.generation; val context = epoch; val requestId = ++listSequence
-        if (!append) cursors.clear()
         mutable.value = current.copy(loading = true, error = null,
-            orders = if (append) current.orders else emptyList(), nextCursor = if (append) cursor else null)
-        viewModelScope.launch {
+            orders = if (append) current.orders else emptyList(), nextOffset = offset)
+        listJob=viewModelScope.launch {
             try {
-                val page = repository.list(eventId, cursor)
+                val page = repository.list(eventId, offset, current.status, current.query)
                 if (expected != session.generation || context != epoch || requestId != listSequence) return@launch
-                page.nextCursor?.let { check(it != cursor && it !in cursors) { "Repeated cursor" } }
-                cursor?.let { cursors.add(it) }
                 mutable.value = mutable.value.copy(loading = false, orders =
-                    ((if (append) mutable.value.orders else emptyList()) + page.items).distinctBy { it.id }, nextCursor = page.nextCursor)
+                    ((if (append) mutable.value.orders else emptyList()) + page.items).distinctBy { it.id },
+                    total=page.total, nextOffset=if(page.items.isEmpty()) page.total else offset+page.items.size)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected == session.generation && context == epoch && requestId == listSequence)
@@ -121,11 +128,13 @@ class OrganizerOrdersViewModel(client: HttpClient, requests: SessionOrdersReposi
         mutable.value = current.copy(refundBusy = true, confirming = false, refundError = null, loading = false)
         viewModelScope.launch {
             try {
-                val result = repository.refund(order.eventId, order.id, reason)
+                val response = repository.refund(requireNotNull(current.eventId), order.id, reason)
                 if (expected != session.generation || context != epoch || requestId != detailSequence) return@launch
+                val result=order.copy(status=response.status, paidAt=response.paidAt,refundedAt=response.refundedAt,cancelledAt=response.cancelledAt,totalAmount=response.totalAmount)
                 mutable.value = mutable.value.copy(refundBusy = false, order = result, refundSucceeded = true,
                     orders = mutable.value.orders.map { if (it.id == result.id) result else it }, reason = "")
                 reload()
+                readOrder(false)
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected != session.generation || context != epoch || requestId != detailSequence) return@launch

@@ -4,63 +4,69 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.biletflow.domain.models.Event
 import com.example.biletflow.domain.repositories.EventsRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-
-enum class EventCategoryFilter { All, Concerts, Lectures, Sport }
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 
 data class EventsUiState(
-    val isLoading: Boolean = true,
-    val events: List<Event> = emptyList(),
-    val loadFailed: Boolean = false,
-    val query: String = "",
-    val category: EventCategoryFilter = EventCategoryFilter.All,
-)
+    val isLoading: Boolean = true, val events: List<Event> = emptyList(), val loadFailed: Boolean = false,
+    val query: String = "", val category: String? = null, val categories: List<String> = emptyList(),
+    val categoriesLoading: Boolean = false, val categoriesError: String? = null,
+    val total: Int = 0, val nextOffset: Int = 0, val loadingMore: Boolean = false,
+    val pageError: String? = null, val error: String? = null, val filterRevision: Int = 0,
+) { val hasMore: Boolean get() = nextOffset < total }
 
-class EventsViewModel(private val repository: EventsRepository) : ViewModel() {
-    private val _state = MutableStateFlow(EventsUiState())
-    val state: StateFlow<EventsUiState> = _state.asStateFlow()
-
+class EventsViewModel(private val repository: EventsRepository, private val pageSize: Int = 20): ViewModel() {
+    private val mutable=MutableStateFlow(EventsUiState())
+    val state=mutable.asStateFlow()
+    private var job: Job?=null
+    private var sequence=0
+    private var categoryJob: Job?=null
     init { reload() }
-
-    fun reload() {
-        if (_state.value.isLoading && (_state.value.events.isNotEmpty() || _state.value.loadFailed)) return
-        _state.value = _state.value.copy(isLoading = true, loadFailed = false)
-        viewModelScope.launch {
-            runCatching { repository.getEvents() }
-                .onSuccess { events ->
-                    _state.value = _state.value.copy(isLoading = false, events = events, loadFailed = false)
-                }
-                .onFailure {
-                    _state.value = _state.value.copy(isLoading = false, events = emptyList(), loadFailed = true)
-                }
+    fun reloadCategories() {
+        if(categoryJob?.isActive == true) return
+        mutable.value=mutable.value.copy(categoriesLoading=true,categoriesError=null)
+        categoryJob=viewModelScope.launch {
+            try { val categories=repository.getCategories().distinct(); mutable.value=mutable.value.copy(categories=categories,categoriesLoading=false) }
+            catch(error: Exception) { if(error is CancellationException) throw error; mutable.value=mutable.value.copy(categoriesLoading=false,categoriesError=error.message ?: "network") }
         }
     }
-
-    fun updateQuery(query: String) { _state.value = _state.value.copy(query = query) }
-    fun selectCategory(category: EventCategoryFilter) { _state.value = _state.value.copy(category = category) }
-}
-
-internal fun filterEvents(events: List<Event>, query: String, category: EventCategoryFilter): List<Event> {
-    val normalizedQuery = query.trim().lowercase()
-    return events.filter { event ->
-        val matchesQuery = normalizedQuery.isEmpty() ||
-            event.title.lowercase().contains(normalizedQuery) ||
-            event.venueName?.lowercase()?.contains(normalizedQuery) == true
-        matchesQuery && category.matches(event.category)
+    fun updateQuery(query: String) {
+        if(query == mutable.value.query) return
+        mutable.value=mutable.value.copy(query=query)
+        reset(300)
     }
-}
-
-private fun EventCategoryFilter.matches(value: String?): Boolean {
-    if (this == EventCategoryFilter.All) return true
-    val normalized = value?.trim()?.lowercase() ?: return false
-    return when (this) {
-        EventCategoryFilter.All -> true
-        EventCategoryFilter.Concerts -> normalized in setOf("concert", "concerts", "концерт", "концерты")
-        EventCategoryFilter.Lectures -> normalized in setOf("lecture", "lectures", "лекция", "лекции")
-        EventCategoryFilter.Sport -> normalized in setOf("sport", "sports", "спорт")
+    fun selectCategory(category: String?) {
+        if(category == mutable.value.category) return
+        mutable.value=mutable.value.copy(category=category)
+        reset(0)
+    }
+    private fun reset(debounce: Long) {
+        mutable.value=mutable.value.copy(filterRevision=mutable.value.filterRevision+1)
+        load(false,debounce)
+    }
+    fun reload() { load(false,0); reloadCategories() }
+    fun loadMore() { if(!mutable.value.isLoading && !mutable.value.loadingMore && mutable.value.hasMore) load(true,0) }
+    private fun load(append: Boolean,debounce: Long) {
+        job?.cancel(); val id=++sequence
+        val current=mutable.value
+        val offset=if(append) current.nextOffset else 0
+        mutable.value=current.copy(isLoading=!append,loadingMore=append,loadFailed=false,error=null,pageError=null,
+            events=if(append) current.events else emptyList(),total=if(append) current.total else 0,nextOffset=offset)
+        job=viewModelScope.launch {
+            try {
+                delay(debounce)
+                val page=repository.getEventsPage(current.query.trim().takeIf { it.isNotEmpty() },current.category,pageSize,offset)
+                if(id != sequence) return@launch
+                mutable.value=mutable.value.copy(isLoading=false,loadingMore=false,
+                    events=((if(append) mutable.value.events else emptyList())+page.items).distinctBy { it.id },
+                    total=page.total,nextOffset=if(page.items.isEmpty()) page.total else offset+page.items.size)
+            } catch(error: Exception) {
+                if(error is CancellationException) throw error
+                if(id != sequence) return@launch
+                mutable.value=mutable.value.copy(isLoading=false,loadingMore=false,loadFailed=!append,
+                    error=if(append) null else error.message ?: "network",pageError=if(append) error.message ?: "network" else null)
+            }
+        }
     }
 }
 

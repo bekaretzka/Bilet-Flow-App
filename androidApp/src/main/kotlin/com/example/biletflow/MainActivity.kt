@@ -17,9 +17,16 @@ class MainActivity : ComponentActivity() {
         }
         onBackPressedDispatcher.addCallback(this, backCallback)
 
+        val config = runCatching { com.example.biletflow.core.network.NetworkSettings.configure(
+            BuildConfig.API_ENVIRONMENT, BuildConfig.API_LOCAL_URL, BuildConfig.API_STAGING_URL) }
         setContent {
-            App(useMockEvents = BuildConfig.DEBUG, sessionStorage = androidx.compose.runtime.remember {
-                AndroidSessionStorage(applicationContext, if (BuildConfig.DEBUG) "mock" else "api")
+            if(config.isFailure) {
+                NetworkConfigurationError(config.exceptionOrNull()?.message.orEmpty())
+                return@setContent
+            }
+            val network = config.getOrThrow()
+            App(useMockEvents = network.environment == com.example.biletflow.core.network.ApiEnvironment.MOCK, sessionStorage = androidx.compose.runtime.remember {
+                AndroidSessionStorage(applicationContext, network.sessionNamespace)
             }, registerBack = { action ->
                 backAction = action
                 backCallback.isEnabled = action != null

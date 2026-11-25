@@ -22,17 +22,41 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OrganizerTicketTypesTest {
-    @Test fun fullDraftListFreshViewModelPaginationMutationsRecoveryAndAccess() = runTest {
+    @Test fun manageSuspensionClearsSessionAndPersistentRecord() = runTest {
+        var record: String? = null
+        val storage = object : com.example.biletflow.domain.session.SessionStorage {
+            override suspend fun read() = record
+            override suspend fun write(value: String) { record = value }
+            override suspend fun clear() { record = null }
+        }
+        val client = createMockEventsHttpClient()
+        try {
+            val auth = AuthRepositoryImpl(client,"http://test")
+            auth.register("suspend-on-manage@biletflow.kz","password123")
+            val store = SessionStore(storage,this)
+            store.save(auth.login("suspend-on-manage@biletflow.kz","password123"))
+            advanceUntilIdle(); assertNotNull(record)
+            val requests = SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)
+            val repo = OrganizerTicketTypesRepository(client,requests,"http://test")
+            val error = assertFailsWith<OrdersApiException> { repo.list(103) }
+            assertEquals("UserSuspendedError",error.errorCode)
+            assertTrue(store.suspended.value); assertNull(store.tokens.value)
+            advanceUntilIdle(); assertNull(record)
+        } finally { client.close() }
+    }
+
+    @Test fun fullManageListFreshViewModelMutationsRecoveryAndAccess() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val client = createMockEventsHttpClient()
         var lose: String? = null
         val writes = mutableMapOf<String, Int>()
-        val cursors = mutableListOf<String?>()
+        val managePaths = mutableListOf<String>()
         client.plugin(HttpSend).intercept { request ->
             val path = request.url.build().encodedPath
-            if (path.startsWith("/organizer/") && path.endsWith("/ticket-types")) {
-                request.url.parameters["limit"] = "1"
-                cursors.add(request.url.parameters["cursor"])
+            assertFalse(path.startsWith("/organizer/") && path.contains("ticket-types"))
+            if (path.endsWith("/ticket-types/manage")) {
+                assertTrue(request.url.parameters.isEmpty())
+                managePaths.add(path)
             }
             if (request.method in listOf(HttpMethod.Post, HttpMethod.Patch)) writes[path] = writes.getOrElse(path) { 0 } + 1
             val response = execute(request)
@@ -67,10 +91,13 @@ class OrganizerTicketTypesTest {
             assertEquals(2, form.list(event.id).size)
             fresh.load(event.id); settled(fresh)
             assertEquals(2, fresh.list(event.id).size)
-            assertTrue(cursors.any { it != null })
+            assertTrue(managePaths.all { it == "/events/${event.id}/ticket-types/manage" })
             val ticket = fresh.list(event.id).first()
             val public = EventsRepositoryImpl(client, "http://test")
             assertFails { public.getTicketTypes(event.id) } // Draft remains unavailable publicly.
+            assertEquals(200,client.patch("http://test/events/${event.id}/publish") { bearerAuth(session.tokens.value!!.accessToken) }.status.value)
+            assertEquals(2,repository.list(event.id).size)
+            assertEquals(2,public.getTicketTypes(event.id).size)
 
             fresh.edit(ticket); fresh.update("price", "1500"); fresh.update("description", "")
             lose = "/ticket-types/${ticket.id}"
@@ -89,6 +116,7 @@ class OrganizerTicketTypesTest {
             assertTrue(ticket.id in fresh.state.value.hideUnknown)
             fresh.checkHidden(ticket); settled(fresh)
             assertTrue(fresh.list(event.id).first { it.id == ticket.id }.isHidden)
+            assertTrue(public.getTicketTypes(event.id).none { it.id == ticket.id })
             assertFalse(ticket.id in fresh.state.value.hideUnknown)
             form.load(event.id); settled()
             assertTrue(form.list(event.id).first { it.id == ticket.id }.isHidden)
@@ -98,6 +126,7 @@ class OrganizerTicketTypesTest {
             form.checkHidden(ticket); settled()
             assertFalse(ticket.id in form.state.value.hideUnknown)
             assertFalse(repository.get(event.id, ticket.id).isHidden)
+            assertTrue(public.getTicketTypes(event.id).any { it.id == ticket.id })
 
             lose = "/events/${event.id}/ticket-type"
             type(event.id, "Same name")
@@ -129,7 +158,7 @@ class OrganizerTicketTypesTest {
         }
     }
 
-    @Test fun latePagesCannotRestorePreviousEventOrAccountAndErrorsRemainVisible() = runTest {
+    @Test fun lateListsCannotRestorePreviousEventOrAccountAndErrorsRemainVisible() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val gate = CompletableDeferred<Unit>()
         val accountGate = CompletableDeferred<Unit>()
@@ -138,7 +167,7 @@ class OrganizerTicketTypesTest {
             if (request.url.encodedPath.contains("/101/")) withContext(NonCancellable) { gate.await() }
             if (request.url.encodedPath.contains("/103/")) withContext(NonCancellable) { accountGate.await() }
             if (fail && request.url.encodedPath.contains("/102/")) respond("""{"detail":"Route unavailable"}""", HttpStatusCode.NotFound, headersOf(HttpHeaders.ContentType,"application/json"))
-            else respond("""{"items":[],"next_cursor":null}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType,"application/json"))
+            else respond("[]", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType,"application/json"))
         }) { install(ContentNegotiation) { json() } }
         val session = SessionStore().apply { save(AuthTokens("access", "refresh", "bearer")) }
         val requests = SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"), AuthRepositoryImpl(client,"http://test"), session, backgroundScope)

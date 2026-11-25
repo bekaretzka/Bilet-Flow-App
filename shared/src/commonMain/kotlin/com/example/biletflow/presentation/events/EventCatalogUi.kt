@@ -57,13 +57,8 @@ fun EventCatalogPage(
     scrollState: androidx.compose.foundation.ScrollState = rememberScrollState(),
 ) {
     val state by viewModel.state.collectAsState()
-    val visibleEvents = filterEvents(state.events, state.query, state.category)
-    val filters = listOf(
-        EventCategoryFilter.All to stringResource(Res.string.events_filter_all),
-        EventCategoryFilter.Concerts to stringResource(Res.string.events_filter_concerts),
-        EventCategoryFilter.Lectures to stringResource(Res.string.events_filter_lectures),
-        EventCategoryFilter.Sport to stringResource(Res.string.events_filter_sport),
-    )
+    val visibleEvents = state.events
+    val filters = listOf(null to stringResource(Res.string.events_filter_all)) + state.categories.map { it to it }
 
     Column(
         modifier = Modifier.fillMaxSize().background(PageBackground)
@@ -97,14 +92,19 @@ fun EventCatalogPage(
         Spacer(Modifier.height(22.dp))
         when {
             state.isLoading -> CatalogMessage(stringResource(Res.string.events_loading), loading = true)
-            state.loadFailed -> ErrorState(onRetry = viewModel::reload)
-            state.events.isEmpty() -> CatalogMessage(stringResource(Res.string.events_empty_catalog))
+            state.loadFailed -> { ErrorState(onRetry = viewModel::reload); Text(state.error.orEmpty()) }
+            state.events.isEmpty() -> CatalogMessage(stringResource(if(state.query.trim().isNotEmpty() || state.category != null) Res.string.events_no_matches else Res.string.events_empty_catalog))
             visibleEvents.isEmpty() -> CatalogMessage(stringResource(Res.string.events_no_matches))
             else -> visibleEvents.forEach { event ->
                 EventCard(event = event, onClick = { onOpenEvent(event.id) })
                 Spacer(Modifier.height(16.dp))
             }
         }
+        if(state.categoriesLoading) CircularProgressIndicator()
+        if(state.categoriesError != null) { Text(state.categoriesError.orEmpty()); TextButton(onClick=viewModel::reloadCategories) { Text(stringResource(Res.string.catalog_categories_retry)) } }
+        if(state.loadingMore) CircularProgressIndicator()
+        state.pageError?.let { Text(it); TextButton(onClick=viewModel::loadMore) { Text(stringResource(Res.string.events_retry)) } }
+        if(state.hasMore && state.pageError == null && !state.isLoading) TextButton(onClick=viewModel::loadMore,enabled=!state.loadingMore) { Text(stringResource(Res.string.catalog_more)) }
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -250,6 +250,7 @@ private val previewEvent = Event(
 private fun EventCatalogPreview() {
     val repository = object : EventsRepository {
         override suspend fun getEvents() = listOf(previewEvent)
+        override suspend fun getEventsPage(q: String?, category: String?, limit: Int, offset: Int) = com.example.biletflow.domain.models.EventPage(listOf(previewEvent),1)
         override suspend fun getEvent(eventId: Int) = previewEvent
         override suspend fun getTicketTypes(eventId: Int) = emptyList<TicketType>()
     }

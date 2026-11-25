@@ -35,6 +35,10 @@ class SessionOrdersRepository(
                 } catch (error: Exception) {
                     ensureSession(generation)
                     if (error is CancellationException) throw error
+                    if(error is AuthApiException && error.statusCode == 403 && error.errorCode == "UserSuspendedError") {
+                        session.suspendSession(generation)
+                        throw OrdersApiException(403,error.errorCode,error.message)
+                    }
                     if (error is AuthApiException && error.statusCode == 401) {
                         session.clear()
                         throw OrdersApiException(401, null, "Session expired")
@@ -60,17 +64,37 @@ class SessionOrdersRepository(
         val token = session.tokens.value?.accessToken ?: throw OrdersApiException(401, null, "Login required")
         try {
             return call(token).also { ensureSession(generation) }
-        } catch (error: OrdersApiException) {
-            if (error.statusCode != 401) throw error
+        } catch (error: Exception) {
+            ensureSession(generation)
+            rejectSuspended(error,generation)
+            if (httpStatus(error) != 401) throw error
         }
         val updated = refreshed(token, generation)
         try {
             return call(updated).also { ensureSession(generation) }
-        } catch (error: OrdersApiException) {
+        } catch (error: Exception) {
             ensureSession(generation)
-            if (error.statusCode == 401) session.clear()
+            rejectSuspended(error,generation)
+            if (httpStatus(error) == 401) session.clear()
             throw error
         }
+    }
+    private fun httpStatus(error: Exception): Int? = when(error) {
+        is OrdersApiException -> error.statusCode
+        is AuthApiException -> error.statusCode
+        is SupportApiException -> error.statusCode
+        is CampaignApiException -> error.status
+        else -> null
+    }
+    private fun rejectSuspended(error: Exception,generation: Long) {
+        val code = when(error) {
+            is OrdersApiException -> error.errorCode
+            is AuthApiException -> error.errorCode
+            is SupportApiException -> error.code
+            is CampaignApiException -> error.code
+            else -> null
+        }
+        if(httpStatus(error) == 403 && code == "UserSuspendedError") session.suspendSession(generation)
     }
 
     override suspend fun getMyOrders(accessToken: String) = request { delegate.getMyOrders(it) }

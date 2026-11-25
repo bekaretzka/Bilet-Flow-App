@@ -251,6 +251,7 @@ private fun AuthFeedback(state: AuthUiState) {
         Text(
             text = when (error) {
                 AuthRequestError.InvalidCredentials -> stringResource(Res.string.auth_error_invalid_credentials)
+                AuthRequestError.Suspended -> stringResource(Res.string.session_suspended)
                 AuthRequestError.Network -> stringResource(Res.string.auth_error_network)
                 AuthRequestError.ExistingEmail -> stringResource(Res.string.auth_error_existing_email)
                 AuthRequestError.Fields -> stringResource(Res.string.auth_error_fields)

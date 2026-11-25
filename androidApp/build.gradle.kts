@@ -24,6 +24,8 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
+        buildConfigField("String", "API_LOCAL_URL", "\"${providers.gradleProperty("biletflow.localUrl").getOrElse("http://10.0.2.2:8000")}\"")
+        buildConfigField("String", "API_STAGING_URL", "\"${providers.gradleProperty("biletflow.stagingUrl").getOrElse("")}\"")
         applicationId = "com.example.biletflow"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
@@ -36,7 +38,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            buildConfigField("String", "API_ENVIRONMENT", "\"${providers.gradleProperty("biletflow.environment").getOrElse("mock")}\"")
+        }
         release {
+            buildConfigField("String", "API_ENVIRONMENT", "\"${providers.gradleProperty("biletflow.environment").getOrElse("staging")}\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

@@ -21,6 +21,21 @@ class SessionStore(
     val restoring = _restoring.asStateFlow()
     private val _storageError = MutableStateFlow(false)
     val storageError = _storageError.asStateFlow()
+    private val _user = MutableStateFlow<com.example.biletflow.domain.models.CurrentUser?>(null)
+    val user = _user.asStateFlow()
+    private val _suspended = MutableStateFlow(false)
+    val suspended = _suspended.asStateFlow()
+    fun dismissSuspended() { _suspended.value = false }
+    fun suspendSession(expected: Long) {
+        if(generation != expected) return
+        clear(); _suspended.value = true
+    }
+    fun setUser(user: com.example.biletflow.domain.models.CurrentUser, expected: Long) {
+        if(generation != expected || _tokens.value == null) return
+        _user.value = user
+        _tokens.value = _tokens.value?.copy(email=user.email)
+        persist()
+    }
     fun dismissStorageError() { _storageError.value = false }
 
     suspend fun restore() {
@@ -70,6 +85,8 @@ class SessionStore(
     val tokens: StateFlow<AuthTokens?> = _tokens.asStateFlow()
 
     fun save(tokens: AuthTokens) {
+        _user.value = null
+        _suspended.value = false
         generation++
         _tokens.value = tokens
         persist()
@@ -81,6 +98,7 @@ class SessionStore(
     }
 
     fun clear() {
+        _user.value = null
         generation++
         _tokens.value = null
         persist()

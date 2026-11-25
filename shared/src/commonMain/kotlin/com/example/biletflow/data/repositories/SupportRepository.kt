@@ -27,6 +27,10 @@ data class SupportRequest(
     @SerialName("created_at") val createdAt: String,
     @SerialName("updated_at") val updatedAt: String = createdAt,
     @SerialName("event_title") val eventTitle: String? = null,
+    @SerialName("author_id") val authorId: Int? = null,
+    @SerialName("author_name") val authorName: String? = null,
+    @SerialName("author_email") val authorEmail: String? = null,
+    @SerialName("can_manage_status") val canManageStatus: Boolean = false,
 )
 @Serializable
 data class SupportRequestsPage(val items: List<SupportRequest>, @SerialName("next_cursor") val nextCursor: String?)
@@ -36,11 +40,26 @@ data class SupportMessage(val id: Int, @SerialName("request_id") val requestId: 
     val text: String, @SerialName("created_at") val createdAt: String)
 @Serializable
 data class SupportMessagesPage(val items: List<SupportMessage>, @SerialName("next_cursor") val nextCursor: String?)
+@Serializable
+data class SupportMessageCreate(val body: String, @SerialName("client_request_id") val clientRequestId: String)
+@Serializable
+data class SupportStatusChange(val status: String, @SerialName("expected_status") val expectedStatus: String)
 class SupportApiException(val statusCode: Int, val code: String?, val fields: Set<String>, override val message: String) : Exception(message)
 
 class SupportRepository(private val client: HttpClient, private val requests: SessionOrdersRepository, private val baseUrl: String) {
-    private suspend inline fun <reified T> read(path: String, cursor: String? = null, limit: Int? = null): T = requests.request { token ->
-        val response = client.get("$baseUrl$path") { bearerAuth(token); cursor?.let { parameter("cursor",it) }; limit?.let { parameter("limit",it) } }
+    suspend fun changeStatus(id: Int, payload: SupportStatusChange): SupportRequest = requests.request { token ->
+        val response = client.patch("$baseUrl/support/requests/$id/status") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(payload)
+        }
+        if(response.status.value != 200) {
+            val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+            throw OrdersApiException(response.status.value,(body?.get("error") as? JsonPrimitive)?.contentOrNull,
+                (body?.get("message") ?: body?.get("detail"))?.toString() ?: "HTTP ${response.status.value}")
+        }
+        response.body<SupportRequest>().also { require(it.id == id) }
+    }
+    private suspend inline fun <reified T> read(path: String, cursor: String? = null, limit: Int? = null, afterId: Int? = null): T = requests.request { token ->
+        val response = client.get("$baseUrl$path") { bearerAuth(token); cursor?.let { parameter("cursor",it) }; limit?.let { parameter("limit",it) }; afterId?.let { parameter("after_id",it) } }
         if (response.status.value != 200) {
             val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
             throw OrdersApiException(response.status.value, (body?.get("error") as? JsonPrimitive)?.contentOrNull,
@@ -49,9 +68,20 @@ class SupportRepository(private val client: HttpClient, private val requests: Se
         response.body<T>()
     }
     suspend fun list(cursor: String? = null, limit: Int = 50): SupportRequestsPage = read("/support/requests/me",cursor,limit)
+    suspend fun eventList(eventId: Int, cursor: String? = null, limit: Int = 50): SupportRequestsPage =
+        read<SupportRequestsPage>("/organizer/events/$eventId/support/requests",cursor,limit).also { require(it.items.all { item -> item.eventId == eventId }) }
     suspend fun get(id: Int): SupportRequest = read<SupportRequest>("/support/requests/$id").also { require(it.id == id) }
-    suspend fun messages(id: Int, cursor: String? = null, limit: Int = 50): SupportMessagesPage =
-        read<SupportMessagesPage>("/support/requests/$id/messages",cursor,limit).also { require(it.items.all { item -> item.requestId == id }) }
+    suspend fun messages(id: Int, cursor: String? = null, limit: Int = 50, afterId: Int? = null): SupportMessagesPage =
+        read<SupportMessagesPage>("/support/requests/$id/messages",cursor,limit,afterId).also { require(it.items.all { item -> item.requestId == id }) }
+    suspend fun send(id: Int, payload: SupportMessageCreate): SupportMessage = requests.request { token ->
+        val response = client.post("$baseUrl/support/requests/$id/messages") { bearerAuth(token); contentType(ContentType.Application.Json); setBody(payload) }
+        if(response.status.value != 201) {
+            val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+            throw OrdersApiException(response.status.value,(body?.get("error") as? JsonPrimitive)?.contentOrNull,
+                (body?.get("message") ?: body?.get("detail"))?.toString() ?: "HTTP ${response.status.value}")
+        }
+        response.body<SupportMessage>().also { require(it.requestId == id && it.text == payload.body) }
+    }
     suspend fun create(payload: SupportCreate): SupportRequest = requests.request { token ->
         val response = client.post("$baseUrl/support/requests") {
             bearerAuth(token); contentType(ContentType.Application.Json); setBody(payload)

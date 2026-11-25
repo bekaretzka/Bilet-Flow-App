@@ -37,7 +37,7 @@ data class OrganizerState(val loading: Boolean = false, val profile: OrganizerPr
     val form: Boolean = false)
 
 class OrganizerViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
-    private val session: SessionStore, private val baseUrl: String = apiBaseUrl) : ViewModel() {
+    private val session: SessionStore, private val baseUrl: String = apiBaseUrl, private val onApplied: () -> Unit = {}) : ViewModel() {
     private val mutable = MutableStateFlow(OrganizerState())
     val state = mutable.asStateFlow()
     private var generation = session.generation
@@ -70,11 +70,13 @@ class OrganizerViewModel(private val client: HttpClient, private val requests: S
                 }
                 if (expected == session.generation && requestId == sequence)
                     mutable.value = OrganizerState(profile = profile)
+                if(apply && expected == session.generation && requestId == sequence) onApplied()
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected != session.generation || requestId != sequence) return@launch
                 val api = error as? OrdersApiException
                 if (apply && api?.errorCode == "OrganizerProfileAlreadyExistsError") {
+                    onApplied()
                     mutable.value = mutable.value.copy(loading = false, form = false)
                     load()
                 } else if (!apply && api?.statusCode == 404 && api.errorCode == "OrganizerNotFoundError") {

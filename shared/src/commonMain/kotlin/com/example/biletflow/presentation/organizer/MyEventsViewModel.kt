@@ -101,7 +101,7 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
                     }
                 }
                 if (expected == session.generation && requestId == sequence)
-                    mutable.value = mutable.value.copy(loading = false, events = events, statusUnknown = false)
+                    { session.user.value?.let { user -> require(events.all(user::owns)) }; mutable.value = mutable.value.copy(loading = false, events = events, statusUnknown = false) }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected != session.generation || requestId != sequence) return@launch

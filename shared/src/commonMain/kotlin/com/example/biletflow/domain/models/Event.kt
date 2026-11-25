@@ -20,4 +20,11 @@ data class Event(
     @SerialName("registration_opens_at") val registrationOpensAt: String? = null,
     @SerialName("registration_closes_at") val registrationClosesAt: String? = null,
     @SerialName("refund_policy") val refundPolicy: String? = null,
+    @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("suspended_at") val suspendedAt: String? = null,
+    @SerialName("suspension_reason") val suspensionReason: String? = null,
+    val lifecycle: String = "",
 )
+
+@Serializable
+data class EventPage(val items: List<Event>, val total: Int)

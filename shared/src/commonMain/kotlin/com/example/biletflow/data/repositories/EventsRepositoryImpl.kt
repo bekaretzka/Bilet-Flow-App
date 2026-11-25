@@ -3,11 +3,14 @@ package com.example.biletflow.data.repositories
 import com.example.biletflow.core.network.apiBaseUrl
 import com.example.biletflow.core.network.createHttpClient
 import com.example.biletflow.domain.models.Event
+import com.example.biletflow.domain.models.EventPage
 import com.example.biletflow.domain.models.TicketType
 import com.example.biletflow.domain.repositories.EventsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
 
 class EventsApiException(
     val statusCode: Int,
@@ -19,13 +22,27 @@ class EventsRepositoryImpl(
     private val baseUrl: String = apiBaseUrl,
 ) : EventsRepository {
     override suspend fun getEvents(): List<Event> {
-        val response = client.get("$baseUrl/events")
-        if (response.status.value !in 200..299) {
-            throw EventsApiException(
-                statusCode = response.status.value,
-                message = "Events request failed (${response.status.value})",
-            )
+        val result=linkedMapOf<Int,Event>()
+        var offset=0
+        do {
+            val page=getEventsPage(limit=100,offset=offset)
+            page.items.forEach { result[it.id]=it }; offset+=page.items.size
+            if(page.items.isEmpty() || offset >= page.total) break
+        } while(true)
+        return result.values.toList()
+    }
+    override suspend fun getEventsPage(q: String?,category: String?,limit: Int,offset: Int): EventPage {
+        val response=client.get("$baseUrl/events") {
+            parameter("limit",limit); parameter("offset",offset)
+            q?.trim()?.takeIf { it.isNotEmpty() }?.let { parameter("q",it) }
+            category?.let { parameter("category",it) }
         }
+        if(response.status.value != 200) throw EventsApiException(response.status.value,"HTTP ${response.status.value}: ${response.bodyAsText()}")
+        return response.body<EventPage>().also { require(it.total >= 0 && it.items.size <= limit) }
+    }
+    override suspend fun getCategories(): List<String> {
+        val response=client.get("$baseUrl/events/categories")
+        if(response.status.value != 200) throw EventsApiException(response.status.value,"HTTP ${response.status.value}: ${response.bodyAsText()}")
         return response.body()
     }
 

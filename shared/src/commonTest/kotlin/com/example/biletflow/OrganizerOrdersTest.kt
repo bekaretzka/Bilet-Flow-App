@@ -23,6 +23,74 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OrganizerOrdersTest {
+    private fun row(id: Int) = OrganizerOrder(id,"confirmed",1500,"Buyer $id","buyer@example.kz",
+        "2026-11-25T10:00:00+05:00","2026-11-25T10:01:00+05:00",null,null,
+        500,"SAVE500",45,2,"SIM-$id",null,true)
+
+    @Test fun exactIdBeyondFirstPageUsesUnfilteredListAndParsesMoneyAndNullableRefund() = runTest {
+        val offsets=mutableListOf<Int>()
+        val client=HttpClient(MockEngine { request ->
+            assertEquals("/events/101/orders",request.url.encodedPath)
+            assertNull(request.url.parameters["q"]); assertNull(request.url.parameters["status"])
+            val offset=request.url.parameters["offset"]!!.toInt(); offsets.add(offset)
+            val rows=(151 downTo 100).map(::row).drop(offset).take(50)
+            respond(Json.encodeToString(OrganizerOrdersPage.serializer(),OrganizerOrdersPage(rows,52)),HttpStatusCode.OK,headersOf(HttpHeaders.ContentType,"application/json"))
+        }) { install(ContentNegotiation) { json() } }
+        val store=SessionStore().apply { save(AuthTokens("a","r","bearer")) }
+        try {
+            val repo=OrganizerOrdersRepository(client,SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),AuthRepositoryImpl(client,"http://test"),store,backgroundScope),"http://test")
+            val order=repo.get(101,100)
+            assertEquals(listOf(0,50),offsets); assertEquals(100,order.id)
+            assertEquals(500L,order.discountAmount); assertEquals("SAVE500",order.promoCode)
+            assertEquals(45L,order.processingFee); assertEquals(2,order.tickets)
+            assertEquals("SIM-100",order.paymentReference); assertNull(order.refund); assertTrue(order.isSimulated)
+            assertEquals(404,assertFailsWith<OrdersApiException> { repo.get(101,99) }.statusCode)
+        } finally { client.close() }
+    }
+
+    @Test fun serverFiltersResetOffsetAndIgnoreLateSearchResponses() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val gate=CompletableDeferred<Unit>()
+        val calls=mutableListOf<Pair<String?,Int>>()
+        val client=HttpClient(MockEngine { request ->
+            val q=request.url.parameters["q"]; val offset=request.url.parameters["offset"]!!.toInt()
+            calls.add(q to offset)
+            if(q == "old") withContext(NonCancellable) { gate.await() }
+            val rows=if(q == "old") listOf(row(1)) else if(q == "new") listOf(row(2)) else emptyList()
+            respond(Json.encodeToString(OrganizerOrdersPage.serializer(),OrganizerOrdersPage(rows,rows.size)),HttpStatusCode.OK,headersOf(HttpHeaders.ContentType,"application/json"))
+        }) { install(ContentNegotiation) { json() } }
+        val store=SessionStore().apply { save(AuthTokens("a","r","bearer")) }
+        val vm=OrganizerOrdersViewModel(client,SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),AuthRepositoryImpl(client,"http://test"),store,backgroundScope),store,"http://test")
+        try {
+            runCurrent(); vm.open(101,"Event"); vm.state.first { !it.loading }
+            vm.search("old"); runCurrent(); vm.search("  new  "); vm.state.first { !it.loading }
+            gate.complete(Unit); runCurrent()
+            assertEquals(listOf(2),vm.state.value.orders.map { it.id })
+            assertTrue(calls.all { it.second == 0 }); assertTrue(calls.any { it.first == "new" })
+            vm.status("confirmed"); vm.state.first { !it.loading }
+            assertEquals("confirmed",vm.state.value.status); assertEquals("  new  ",vm.state.value.query)
+        } finally { gate.complete(Unit); vm.viewModelScope.cancel(); client.close(); Dispatchers.resetMain() }
+    }
+
+    @Test fun eventOrdersSuspensionClearsSessionAndStorage() = runTest {
+        var record:String?=null
+        val storage=object:com.example.biletflow.domain.session.SessionStorage {
+            override suspend fun read()=record
+            override suspend fun write(value:String) { record=value }
+            override suspend fun clear() { record=null }
+        }
+        val client=createMockEventsHttpClient()
+        try {
+            val auth=AuthRepositoryImpl(client,"http://test")
+            auth.register("suspend-on-event-orders@biletflow.kz","password123")
+            val store=SessionStore(storage,this).apply { save(auth.login("suspend-on-event-orders@biletflow.kz","password123")) }
+            advanceUntilIdle(); assertNotNull(record)
+            val repo=OrganizerOrdersRepository(client,SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope),"http://test")
+            assertEquals("UserSuspendedError",assertFailsWith<OrdersApiException> { repo.list(101) }.errorCode)
+            advanceUntilIdle(); assertNull(record); assertNull(store.tokens.value); assertTrue(store.suspended.value)
+        } finally { client.close() }
+    }
+
     @Test fun paginationRefundValidationDoubleSubmitAndDownstreamUpdates() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val client = createMockEventsHttpClient()
@@ -31,7 +99,7 @@ class OrganizerOrdersTest {
         var posts = 0
         client.plugin(HttpSend).intercept { request ->
             val path = request.url.build().encodedPath
-            if (path.startsWith("/organizer/") && path.endsWith("/orders")) {
+            if (path.matches(Regex("/events/\\d+/orders"))) {
                 request.url.parameters["limit"] = "1"
                 if (failList) { failList = false; throw kotlinx.io.IOException("List unavailable") }
             }
@@ -55,10 +123,15 @@ class OrganizerOrdersTest {
         try {
             runCurrent(); approve()
             failList = true; vm.open(101,"First"); settled(); assertNotNull(vm.state.value.error)
-            vm.reload(); settled(); assertEquals(1, vm.state.value.orders.size); assertNotNull(vm.state.value.nextCursor)
-            vm.more(); settled(); assertEquals(listOf(7101,7102),vm.state.value.orders.map { it.id }); assertNull(vm.state.value.nextCursor)
+            vm.reload(); settled(); assertEquals(1, vm.state.value.orders.size); assertTrue(vm.state.value.nextOffset < vm.state.value.total)
+            failList=true; vm.more(); settled()
+            assertNotNull(vm.state.value.error); assertEquals(1,vm.state.value.orders.size); assertEquals(1,vm.state.value.nextOffset)
+            vm.more(); settled(); assertEquals(listOf(7102,7101),vm.state.value.orders.map { it.id }); assertEquals(vm.state.value.total,vm.state.value.nextOffset)
             assertEquals(listOf(7102),repo.list(101,status = "confirmed").items.map { it.id })
-            assertEquals(422,assertFailsWith<OrdersApiException> { repo.list(102,cursor = vm.state.value.nextCursor ?: "orders-101-all-after-7101") }.statusCode)
+            assertEquals(2,repo.list(101,q = "  MOCK VISITOR  ").total)
+            assertTrue(repo.list(101,q = "7101").items.isEmpty()) // q is buyer name/email, not an ID search.
+            assertTrue(repo.list(101,q = "%_").items.isEmpty()) // Literal special characters.
+            assertEquals(422,assertFailsWith<OrdersApiException> { repo.list(102,offset = -1) }.statusCode)
             vm.select(7102); settled(); vm.askRefund(); assertFalse(vm.state.value.confirming) // Free order.
             vm.back(); assertEquals(101,vm.state.value.eventId); assertNull(vm.state.value.selectedId)
             vm.select(7101); settled(); vm.askRefund(); assertFalse(vm.state.value.confirming) // Pending.
@@ -75,6 +148,8 @@ class OrganizerOrdersTest {
             hold!!.complete(Unit); settled(); hold = null
             assertEquals("refunded", vm.state.value.order!!.status); assertEquals(5000L,vm.state.value.order!!.totalAmount)
             assertNotNull(vm.state.value.order!!.refundedAt); assertTrue(vm.state.value.refundSucceeded)
+            assertEquals(5000L,vm.state.value.order!!.refund?.amount)
+            assertEquals("Full test refund",vm.state.value.order!!.refund?.reason)
             vm.askRefund(); vm.confirmRefund(); runCurrent(); assertEquals(2,posts)
             assertEquals("refunded",orders.getOrder(7101,"mock-access-token").status)
             assertTrue(orders.getMyOrders("mock-access-token").first { it.id == 7101 }.tickets.all { it.status == "refunded" })
@@ -112,7 +187,7 @@ class OrganizerOrdersTest {
         var failGet = false
         client.plugin(HttpSend).intercept { request ->
             if(request.url.build().encodedPath.endsWith("/refund")) posts++
-            if(failGet && request.url.build().encodedPath == "/organizer/events/102/orders/7103") {
+            if(failGet && request.url.build().encodedPath == "/events/102/orders") {
                 failGet = false; throw kotlinx.io.IOException("Status check unavailable")
             }
             execute(request)
@@ -149,15 +224,13 @@ class OrganizerOrdersTest {
 
     @Test fun lateResponsesCannotRestoreAnotherEventAccountOrSelectedOrder() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val listGate = CompletableDeferred<Unit>(); val detailGate = CompletableDeferred<Unit>()
+        val listGate = CompletableDeferred<Unit>()
         val accountGate = CompletableDeferred<Unit>()
         val client = HttpClient(MockEngine { request ->
             val path = request.url.encodedPath
-            if(path == "/organizer/events/101/orders") withContext(NonCancellable) { listGate.await() }
-            if(path.endsWith("/7101")) withContext(NonCancellable) { detailGate.await() }
-            if(path == "/organizer/events/103/orders") withContext(NonCancellable) { accountGate.await() }
-            val body = if(path.endsWith("/7101")) """{"id":7101,"event_id":101,"status":"confirmed","total_amount":5000,"buyer_name":"Buyer","buyer_email":"b@example.kz","created_at":"2026-11-24T10:00:00+05:00","paid_at":"2026-11-24T10:01:00+05:00","refunded_at":null}"""
-                else """{"items":[],"next_cursor":null}"""
+            if(path == "/events/101/orders") withContext(NonCancellable) { listGate.await() }
+            if(path == "/events/103/orders") withContext(NonCancellable) { accountGate.await() }
+            val body = """{"items":[],"total":0}"""
             respond(body,HttpStatusCode.OK,headersOf(HttpHeaders.ContentType,"application/json"))
         }) { install(ContentNegotiation) { json() } }
         val session = SessionStore().apply { save(AuthTokens("a","r","bearer")) }
@@ -166,13 +239,13 @@ class OrganizerOrdersTest {
         try {
             runCurrent(); vm.open(101,"Old"); runCurrent(); vm.select(7101); runCurrent()
             vm.open(102,"New"); vm.state.first { !it.loading }
-            listGate.complete(Unit); detailGate.complete(Unit); runCurrent()
+            listGate.complete(Unit); runCurrent()
             assertEquals(102,vm.state.value.eventId); assertNull(vm.state.value.order); assertTrue(vm.state.value.orders.isEmpty())
             vm.open(103,"Old account"); runCurrent(); session.save(AuthTokens("other","other-r","bearer")); runCurrent()
             accountGate.complete(Unit); runCurrent()
             assertNull(vm.state.value.eventId); assertTrue(vm.state.value.orders.isEmpty())
         } finally {
-            listGate.complete(Unit); detailGate.complete(Unit); accountGate.complete(Unit); vm.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain()
+            listGate.complete(Unit); accountGate.complete(Unit); vm.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain()
         }
     }
 }
