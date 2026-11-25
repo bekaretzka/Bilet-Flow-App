@@ -286,11 +286,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         if(suspended) AlertDialog(onDismissRequest=sessionStore::dismissSuspended,
             text={ Text(stringResource(Res.string.session_suspended)) },
             confirmButton={ TextButton(onClick=sessionStore::dismissSuspended) { Text("OK") } })
-        val isRoot = campaignsState.eventId == null && !supportHistoryState.open && supportState.eventId == null && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
+        val isRoot = campaignsState.eventId == null && !supportHistoryState.open && !supportState.open && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
             campaignsState.eventId != null && !showLogin -> ({ campaignsVm.back() })
             supportHistoryState.open && !showLogin -> ({ supportHistoryVm.back() })
-            supportState.eventId != null && !showLogin -> ({ if (!supportState.sending) supportVm.close() })
+            supportState.open && !showLogin -> ({ if (!supportState.sending) supportVm.close() })
             organizerOrdersState.eventId != null && !showLogin -> ({ organizerOrdersVm.back() })
             salesState.eventId != null && !showLogin -> ({ salesVm.close() })
             insightsState.eventId != null && !showLogin -> ({ insightsVm.close() })
@@ -361,7 +361,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             supportHistoryState.open && !showLogin -> SupportCasesPage(supportHistoryVm, session != null, eventsRepository) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
             }
-            supportState.eventId != null && !showLogin -> SupportPage(supportVm, session != null, onOpenRequest = { supportHistoryVm.select(it, fromCreation = true) }, onCheckCases = { supportHistoryVm.open() }) {
+            supportState.open && !showLogin -> SupportPage(supportVm, session != null, onOpenRequest = { supportHistoryVm.select(it, fromCreation = true) }, onCheckCases = { supportHistoryVm.open() }) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
             }
             organizerOrdersState.eventId != null && !showLogin -> OrganizerOrdersPage(organizerOrdersVm)
@@ -381,8 +381,9 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 onPaidSales = { paidSalesVm.open(it.id, it.title) }, onAttendees = { attendeesVm.open(it.id, it.title) },
                 onStaff = { staffVm.open(it.id, it.title) }, onSales = { salesVm.open(it.id, it.title) }, onCopy = createEventVm::copySettings,
                 onOrders = { organizerOrdersVm.open(it.id, it.title) }, onSupport = { supportHistoryVm.openEvent(it.id,it.title) }, onCampaigns = { campaignsVm.open(it.id,it.title) },
-                onAnalytics = { insightsVm.openAnalytics(it.id, it.title) }, onHistory = { insightsVm.openHistory(it.id, it.title) })
-            myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open)
+                onAnalytics = { insightsVm.openAnalytics(it.id, it.title) }, onHistory = { insightsVm.openHistory(it.id, it.title) },
+                onPlatformSupport = { supportVm.openPlatform(it.id) })
+            myEventsState.open && !showLogin -> MyEventsPage(myEventsVm, createEventVm::open, onPlatformSupport = { supportVm.openPlatform() })
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(
                 viewModel = authViewModel,
@@ -419,6 +420,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                         .firstOrNull { it.id == ticket.ticketTypeId }?.name,
                     viewModel = ticketQrViewModel,
                     onBack = { selectedTicketId = null },
+                    onSupport = { supportVm.open(ticket.eventId, ticketId = ticket.id) },
                     onLogin = {
                         authViewModel.closeLoginFlow()
                         showLogin = true

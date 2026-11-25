@@ -13,13 +13,14 @@ import org.jetbrains.compose.resources.stringResource
 import com.example.biletflow.presentation.events.formatEventDate
 
 @Composable
-fun MyEventsPage(vm: MyEventsViewModel, onCreate: () -> Unit = {}) {
+fun MyEventsPage(vm: MyEventsViewModel, onCreate: () -> Unit = {}, onPlatformSupport: () -> Unit = {}) {
     val state by vm.state.collectAsState()
     val filtered = state.events.filter { state.filter == null || it.status == state.filter }
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         TextButton(onClick = vm::close) { Text(stringResource(Res.string.organizer_back)) }
         Text(stringResource(Res.string.my_events_title), style = MaterialTheme.typography.headlineLarge)
         Button(onClick = onCreate) { Text(stringResource(Res.string.create_event)) }
+        TextButton(onClick = onPlatformSupport) { Text(stringResource(Res.string.support_platform_title)) }
         TextButton(onClick = vm::reload, enabled = !state.loading) { Text(stringResource(Res.string.my_events_refresh)) }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(null to Res.string.events_filter_all, "draft" to Res.string.my_events_drafts,

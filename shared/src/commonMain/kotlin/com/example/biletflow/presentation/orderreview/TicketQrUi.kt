@@ -47,6 +47,7 @@ fun TicketQrPage(
     onBack: () -> Unit,
     eventsRepository: EventsRepository? = null,
     onLogin: () -> Unit,
+    onSupport: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(ticket.id) { viewModel.load(ticket.id) }
@@ -124,6 +125,7 @@ fun TicketQrPage(
             com.example.biletflow.presentation.documents.DocumentButton(stringResource(Res.string.pdf_ticket),
                 "/tickets/${ticket.id}/pdf", "ticket-${ticket.id}.pdf")
         }
+        onSupport?.let { TextButton(onClick = it) { Text(stringResource(Res.string.support_from_ticket), color = Color(0xFF4035D6)) } }
         Spacer(Modifier.height(24.dp))
     }
 }

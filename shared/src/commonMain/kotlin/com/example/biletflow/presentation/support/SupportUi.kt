@@ -21,6 +21,8 @@ import org.jetbrains.compose.resources.stringResource
 
 
 val supportCategories = attendeeCaseCategories
+/** kind=platform: organizers only; event_id of their own event is optional. */
+val platformCaseCategories = listOf("account", "activation", "payment", "technical")
 // Match Python/Pydantic str.strip(), including Unicode separators and U+001C..U+001F.
 fun supportTrim(value:String):String = value.trim {it.isWhitespace() || it=='\u0085' || it in '\u001C'..'\u001F'}
 fun supportTextLength(value:String):Int = value.indices.count {i ->
@@ -32,7 +34,8 @@ data class SupportState(
     val sending: Boolean = false, val errors: Set<String> = emptySet(), val error: String? = null,
     val unknown: Boolean = false, val previousUnknown: Boolean = false,
     val created: SupportCase? = null, val waitingForLogin: Boolean = false,
-)
+    val platform: Boolean = false,
+) { val open: Boolean get() = eventId != null || platform }
 class SupportViewModel(client: HttpClient, requests: SessionOrdersRepository, private val session: SessionStore,
     baseUrl: String = apiBaseUrl) : ViewModel() {
     private val repository = SupportCasesRepository(client, requests, baseUrl)
@@ -55,6 +58,10 @@ class SupportViewModel(client: HttpClient, requests: SessionOrdersRepository, pr
             category = if (orderId != null || ticketId != null) "ticket_delivery" else "event_information",
             waitingForLogin = session.tokens.value == null)
     }
+    /** Organizer case to the platform; appears in "My cases" and uses the existing thread screen. */
+    fun openPlatform(eventId: Int? = null) {
+        close(); mutable.value = SupportState(eventId = eventId, platform = true, category = "account", waitingForLogin = session.tokens.value == null)
+    }
     fun close() { sequence++; mutable.value = SupportState() }
     fun update(key: String, value: String) {
         val current = mutable.value
@@ -73,16 +80,19 @@ class SupportViewModel(client: HttpClient, requests: SessionOrdersRepository, pr
     }
 
     fun submit() {
-        val current = mutable.value; val id = current.eventId ?: return
+        val current = mutable.value
+        if (!current.open) return
+        val id = current.eventId
         if (current.sending || current.created != null || current.unknown || current.previousUnknown) return
         val errors = buildSet {
-            if (current.category !in supportCategories) add("category")
+            if (current.category !in (if (current.platform) platformCaseCategories else supportCategories)) add("category")
             if (supportTextLength(current.subject.trim()) !in 1..200) add("subject")
             if (supportTextLength(current.message.trim()) !in 1..5000) add("message")
         }
         if (errors.isNotEmpty()) { mutable.value = current.copy(errors = errors); return }
         if (session.tokens.value == null) { mutable.value = current.copy(waitingForLogin = true); return }
-        val payload = SupportCaseCreate(category=current.category,subject=current.subject.trim(),message=current.message.trim(),
+        val payload = if (current.platform) SupportCaseCreate(kind="platform",category=current.category,subject=current.subject.trim(),
+            message=current.message.trim(),eventId=id) else SupportCaseCreate(category=current.category,subject=current.subject.trim(),message=current.message.trim(),
             eventId=if(current.orderId==null && current.ticketId==null) id else null,
             orderId=if(current.ticketId==null) current.orderId else null,ticketId=current.ticketId)
         val expected = session.generation; val requestId = ++sequence
@@ -110,8 +120,8 @@ fun SupportPage(vm: SupportViewModel, isAuthenticated: Boolean, onOpenRequest: (
     val state by vm.state.collectAsState()
     Column(Modifier.fillMaxSize().statusBarsPadding().imePadding().padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = vm::close, enabled = !state.sending) { Text(stringResource(Res.string.support_back)) }
-        Text(stringResource(Res.string.support_contact), style = MaterialTheme.typography.headlineLarge)
-        Text("${stringResource(Res.string.support_event)} #${state.eventId}")
+        Text(stringResource(if (state.platform) Res.string.support_platform_title else Res.string.support_contact), style = MaterialTheme.typography.headlineLarge)
+        state.eventId?.let { Text("${stringResource(Res.string.support_event)} #$it") }
         state.orderId?.let { Text("${stringResource(Res.string.order_result_number)} #$it") }
         state.ticketId?.let { Text("${stringResource(Res.string.attendees_ticket)} #$it") }
         val result = state.created
@@ -123,7 +133,7 @@ fun SupportPage(vm: SupportViewModel, isAuthenticated: Boolean, onOpenRequest: (
             Button(onClick = { onOpenRequest(result.id) }) { Text(stringResource(Res.string.support_open)) }
         } else {
             Text(stringResource(Res.string.support_category))
-            supportCategories.forEach { category ->
+            (if (state.platform) platformCaseCategories else supportCategories).forEach { category ->
                 FilterChip(selected = state.category == category, onClick = { vm.update("category", category) }, enabled = !state.sending,
                     label = { Text(stringResource(when(category) {
                         "event_information" -> Res.string.support_category_event
@@ -133,6 +143,7 @@ fun SupportPage(vm: SupportViewModel, isAuthenticated: Boolean, onOpenRequest: (
                         "seating" -> Res.string.support_category_seating
                         "check_in" -> Res.string.support_category_checkin
                         "account" -> Res.string.support_category_account
+                        "activation" -> Res.string.support_category_activation
                         else -> Res.string.support_category_technical
                     })) })
             }

@@ -626,4 +626,7 @@
     <string name="report_already">You have already reported this event.</string>
     <string name="report_unknown">Result unknown because of a network error. It was not re-sent.</string>
     <string name="report_failed">Unable to send the report</string>
+    <string name="support_platform_title">Contact platform support</string>
+    <string name="support_category_activation">Paid sales activation</string>
+    <string name="support_from_ticket">Contact support about this ticket</string>
 </resources>

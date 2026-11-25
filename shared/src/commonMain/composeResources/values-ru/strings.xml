@@ -626,4 +626,7 @@
     <string name="report_already">Вы уже отправили жалобу.</string>
     <string name="report_unknown">Результат неизвестен из-за ошибки сети. Повторно не отправлялось.</string>
     <string name="report_failed">Не удалось отправить жалобу</string>
+    <string name="support_platform_title">Обращение к платформе</string>
+    <string name="support_category_activation">Активация платных продаж</string>
+    <string name="support_from_ticket">Обращение по этому билету</string>
 </resources>
