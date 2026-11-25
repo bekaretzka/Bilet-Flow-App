@@ -684,4 +684,13 @@
     <string name="support_assign_failed">Не удалось изменить ответственного.</string>
     <string name="support_assignee_invalid">Этот пользователь не может обрабатывать обращение.</string>
     <string name="support_assign_unknown">Результат неизвестен; обращение перечитано. Проверьте ответственного перед повтором.</string>
+    <string name="admin_paid_sales">Платные продажи</string>
+    <string name="admin_settings">Настройки</string>
+    <string name="admin_fee">Взнос</string>
+    <string name="admin_activated">Активировано</string>
+    <string name="admin_reinstate">Возобновить платные продажи</string>
+    <string name="admin_suspend_sales">Приостановить платные продажи</string>
+    <string name="admin_fee_current">Текущий взнос за активацию</string>
+    <string name="admin_fee_new">Новый взнос, KZT (0 и больше)</string>
+    <string name="admin_save">Сохранить</string>
 </resources>

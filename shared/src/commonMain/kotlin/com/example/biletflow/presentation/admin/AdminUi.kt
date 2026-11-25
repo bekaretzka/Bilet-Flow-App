@@ -58,6 +58,9 @@ data class AdminState(
     val selectedId: Int? = null, val busy: Boolean = false, val actionError: AdminFailure? = null, val actionUnknown: Boolean = false,
     val actionDone: Boolean = false, val approval: String? = null, val reason: String = "", val reasonInvalid: Boolean = false,
     val myId: Int? = null,
+    /** 55.7 screens that are not {items,total} lists: "paid_sales" or "settings". */
+    val section: String? = null, val paidStatus: String? = null, val activations: List<JsonObject> = emptyList(),
+    val feeKzt: Long? = null, val feeDraft: String = "", val feeInvalid: Boolean = false,
 ) {
     val selected: JsonObject? get() = selectedId?.let { id -> items.firstOrNull { it.id == id } }
 }
@@ -94,7 +97,7 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
         when {
             s.busy -> Unit
             s.selectedId != null -> mutable.value = s.copy(selectedId = null, actionError = null, actionUnknown = false, actionDone = false, approval = null)
-            s.list != null -> { sequence++; mutable.value = AdminState(open = true) }
+            s.list != null || s.section != null -> { sequence++; mutable.value = AdminState(open = true) }
             else -> close()
         }
     }
@@ -269,10 +272,14 @@ fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit, onSuppo
         val list = state.list
         val selected = state.selected
         when {
+            state.section == "paid_sales" -> item { PaidSalesSection(vm, state) }
+            state.section == "settings" -> item { SettingsSection(vm, state) }
             list == null -> item {
                 Text(stringResource(Res.string.admin_title), style = MaterialTheme.typography.headlineMedium)
                 AdminList.entries.forEach { entry -> OutlinedButton(onClick = { vm.openList(entry) }, modifier = Modifier.fillMaxWidth()) { Text(adminListTitle(entry)) } }
                 OutlinedButton(onClick = onSupportInbox, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.support_admin_inbox)) }
+                OutlinedButton(onClick = { vm.openSection("paid_sales") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.admin_paid_sales)) }
+                OutlinedButton(onClick = { vm.openSection("settings") }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.admin_settings)) }
             }
             selected != null -> item {
                 AdminDetail(vm, state, list, selected, onEventHistory)
