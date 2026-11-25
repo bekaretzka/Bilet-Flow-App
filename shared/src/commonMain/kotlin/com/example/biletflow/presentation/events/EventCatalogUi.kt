@@ -198,7 +198,10 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
             Box(
                 modifier = Modifier.fillMaxWidth().height(190.dp).background(Cover),
                 contentAlignment = Alignment.Center,
-            ) { Text(stringResource(Res.string.event_cover_placeholder), color = Muted, fontSize = 16.sp) }
+            ) {
+                Text(stringResource(Res.string.event_cover_placeholder), color = Muted, fontSize = 16.sp)
+                event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxSize()) }
+            }
             Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                 Tag(category)
                 Spacer(Modifier.height(10.dp))

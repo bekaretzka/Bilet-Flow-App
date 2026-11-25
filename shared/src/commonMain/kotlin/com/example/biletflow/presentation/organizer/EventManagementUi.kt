@@ -32,7 +32,22 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
             }
             event == null -> Text(stringResource(Res.string.event_management_missing))
             else -> {
+                event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxWidth().height(160.dp)) }
                 Text(event.title, style = MaterialTheme.typography.headlineLarge)
+                val pickCover = com.example.biletflow.core.platform.rememberImagePicker { picked -> if (picked != null) vm.changeCover(picked) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = pickCover, enabled = !state.coverBusy && !state.loading) { Text(stringResource(Res.string.cover_upload)) }
+                    if (event.imageUrl != null) TextButton(onClick = { vm.changeCover(null) }, enabled = !state.coverBusy && !state.loading) { Text(stringResource(Res.string.cover_remove)) }
+                }
+                Text(stringResource(Res.string.cover_help))
+                if (state.coverBusy) CircularProgressIndicator()
+                state.coverError?.let { code -> Text(when (code) {
+                    "ImageTooLargeError" -> stringResource(Res.string.cover_too_large)
+                    "InvalidImageError" -> stringResource(Res.string.cover_invalid)
+                    "StorageNotConfiguredError", "StorageUnavailableError" -> stringResource(Res.string.cover_storage)
+                    "network" -> stringResource(Res.string.cover_network)
+                    else -> "${stringResource(Res.string.cover_failed)} ($code)"
+                }, color = MaterialTheme.colorScheme.error) }
                 Text(formatEventDate(event.startTime))
                 Text(formatEventDate(event.endTime))
                 Text(event.status)

@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -117,6 +119,7 @@ private fun EventDetailsContent(
             contentAlignment = Alignment.Center,
         ) {
             Text(stringResource(Res.string.event_details_cover_placeholder), color = Muted, fontSize = 16.sp)
+            event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))) }
         }
         Spacer(Modifier.height(18.dp))
         Tag(

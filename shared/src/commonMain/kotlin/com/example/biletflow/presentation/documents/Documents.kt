@@ -37,6 +37,8 @@ class DocumentDownloader(private val client: HttpClient, private val requests: S
         if (!type.startsWith(mimeType, ignoreCase = true)) throw OrdersApiException(502, null, "Unexpected content type $type")
         response.body<ByteArray>()
     }
+    fun publicClient(): HttpClient = client
+    fun absolute(url: String): String = if (url.startsWith("http://") || url.startsWith("https://")) url else baseUrl.trimEnd('/') + "/" + url.trimStart('/')
     suspend fun <T> requestsCall(call: suspend (HttpClient, String, String) -> T): T = requests.request { token -> call(client, baseUrl, token) }
 }
 
@@ -52,6 +54,24 @@ suspend fun DocumentDownloader.postJson(path: String, body: kotlinx.serializatio
 }
 
 val LocalDocuments = staticCompositionLocalOf<DocumentDownloader?> { null }
+
+private val publicImageCache = mutableMapOf<String, androidx.compose.ui.graphics.ImageBitmap>()
+
+/** Cover image from image_url: loaded without a token, decoded like the ticket QR PNG, cached in memory per URL. */
+@Composable
+fun PublicImage(url: String, description: String?, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    val documents = LocalDocuments.current ?: return
+    var image by remember(url) { mutableStateOf(publicImageCache[url]) }
+    LaunchedEffect(url) {
+        if (image != null) return@LaunchedEffect
+        val loaded = runCatching {
+            val response = documents.publicClient().get(documents.absolute(url))
+            if (response.status.value == 200) response.body<ByteArray>().decodeToImageBitmap() else null
+        }.getOrNull()
+        if (loaded != null) { publicImageCache[url] = loaded; image = loaded }
+    }
+    image?.let { androidx.compose.foundation.Image(it, description, modifier, contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
+}
 
 /** One download per press; the button stays disabled until it completes. A result from another account is dropped. */
 @Composable

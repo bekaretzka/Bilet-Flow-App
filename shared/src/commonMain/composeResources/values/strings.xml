@@ -629,4 +629,12 @@
     <string name="support_platform_title">Contact platform support</string>
     <string name="support_category_activation">Paid sales activation</string>
     <string name="support_from_ticket">Contact support about this ticket</string>
+    <string name="cover_upload">Upload cover</string>
+    <string name="cover_remove">Remove cover</string>
+    <string name="cover_help">JPEG, PNG or WebP, up to 5 MB.</string>
+    <string name="cover_too_large">The image is larger than 5 MB.</string>
+    <string name="cover_invalid">Only JPEG, PNG or WebP images are accepted.</string>
+    <string name="cover_storage">Image storage is unavailable now. Try later.</string>
+    <string name="cover_network">Network error. Check the event before trying again.</string>
+    <string name="cover_failed">Unable to change the cover</string>
 </resources>

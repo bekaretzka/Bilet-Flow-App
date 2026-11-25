@@ -23,7 +23,8 @@ data class MyEventsState(val open: Boolean = false, val loading: Boolean = false
     val statusError: String? = null, val statusSuccess: Boolean = false, val catalogDirty: Boolean = false,
     val duplicateOpen: Boolean = false, val duplicateTitle: String = "", val duplicateStart: String = "",
     val duplicating: Boolean = false, val duplicateError: String? = null, val duplicateUnknown: Boolean = false,
-    val duplicateStartInvalid: Boolean = false)
+    val duplicateStartInvalid: Boolean = false,
+    val coverBusy: Boolean = false, val coverError: String? = null)
 
 class MyEventsViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
     private val session: SessionStore, private val baseUrl: String = apiBaseUrl) : ViewModel() {
@@ -56,6 +57,48 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
         reload()
     }
     fun catalogRefreshed() { mutable.value = mutable.value.copy(catalogDirty = false) }
+    fun coverPickFailed() { mutable.value = mutable.value.copy(coverError = "InvalidImageError") }
+    /** PUT /events/{id}/image (multipart field "file"; Ktor sets the boundary) or DELETE; both return Event. Not retried. */
+    fun changeCover(image: com.example.biletflow.core.platform.PickedImage?) {
+        val current = mutable.value
+        val id = current.selectedId ?: return
+        if (current.coverBusy || current.loading) return
+        if (image != null) {
+            if (image.mimeType !in listOf("image/jpeg", "image/png", "image/webp")) { mutable.value = current.copy(coverError = "InvalidImageError"); return }
+            if (image.bytes.size > 5 * 1024 * 1024) { mutable.value = current.copy(coverError = "ImageTooLargeError"); return }
+        }
+        val expected = session.generation
+        mutable.value = current.copy(coverBusy = true, coverError = null)
+        viewModelScope.launch {
+            try {
+                val event = requests.request { token ->
+                    val response = if (image == null) client.delete("$baseUrl/events/$id/image") { bearerAuth(token) }
+                    else client.put("$baseUrl/events/$id/image") {
+                        bearerAuth(token)
+                        setBody(io.ktor.client.request.forms.MultiPartFormDataContent(io.ktor.client.request.forms.formData {
+                            append("file", image.bytes, io.ktor.http.Headers.build {
+                                append(io.ktor.http.HttpHeaders.ContentType, image.mimeType)
+                                append(io.ktor.http.HttpHeaders.ContentDisposition, "filename=\"${image.fileName}\"")
+                            })
+                        }))
+                    }
+                    if (response.status.value == 200) response.body<Event>() else {
+                        val payload = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+                        throw OrdersApiException(response.status.value, payload?.get("error")?.jsonPrimitive?.contentOrNull, "Cover change failed")
+                    }
+                }
+                if (expected != session.generation) return@launch
+                require(event.id == id)
+                updated(event)
+                mutable.value = mutable.value.copy(coverBusy = false, catalogDirty = true)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                if (expected != session.generation) return@launch
+                val api = error as? OrdersApiException
+                mutable.value = mutable.value.copy(coverBusy = false, coverError = api?.errorCode ?: api?.let { "HTTP ${it.statusCode}" } ?: "network")
+            }
+        }
+    }
     fun openDuplicate() { if (!mutable.value.duplicating) mutable.value = mutable.value.copy(duplicateOpen = true, duplicateTitle = "", duplicateStart = "",
         duplicateError = null, duplicateUnknown = false, duplicateStartInvalid = false) }
     fun closeDuplicate() { if (!mutable.value.duplicating) mutable.value = mutable.value.copy(duplicateOpen = false, duplicateUnknown = false, duplicateError = null) }

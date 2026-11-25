@@ -629,4 +629,12 @@
     <string name="support_platform_title">Обращение к платформе</string>
     <string name="support_category_activation">Активация платных продаж</string>
     <string name="support_from_ticket">Обращение по этому билету</string>
+    <string name="cover_upload">Загрузить обложку</string>
+    <string name="cover_remove">Удалить обложку</string>
+    <string name="cover_help">JPEG, PNG или WebP, до 5 МБ.</string>
+    <string name="cover_too_large">Изображение больше 5 МБ.</string>
+    <string name="cover_invalid">Принимаются только изображения JPEG, PNG или WebP.</string>
+    <string name="cover_storage">Хранилище изображений сейчас недоступно. Попробуйте позже.</string>
+    <string name="cover_network">Ошибка сети. Проверьте мероприятие перед новой попыткой.</string>
+    <string name="cover_failed">Не удалось изменить обложку</string>
 </resources>
