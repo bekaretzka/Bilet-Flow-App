@@ -693,4 +693,10 @@
     <string name="admin_fee_current">Текущий взнос за активацию</string>
     <string name="admin_fee_new">Новый взнос, KZT (0 и больше)</string>
     <string name="admin_save">Сохранить</string>
+    <string name="admin_orders">Заказы</string>
+    <string name="admin_payments">Платежи</string>
+    <string name="admin_refunds">Возвраты</string>
+    <string name="admin_filter_purpose">Назначение</string>
+    <string name="admin_filter_active">Активна</string>
+    <string name="admin_row_unreadable">строку не удалось прочитать</string>
 </resources>

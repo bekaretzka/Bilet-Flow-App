@@ -45,6 +45,10 @@ enum class AdminList(val path: String, val key: String, val hasQ: Boolean, val f
     Users("/admin/users", "users", true, mapOf("suspended" to listOf("true", "false"))),
     Events("/admin/events", "events", true, mapOf("status" to listOf("draft", "published", "cancelled"), "suspended" to listOf("true", "false"))),
     Reports("/admin/event-reports", "event-reports", false, mapOf("status" to listOf("open", "dismissed", "actioned"), "event_id" to null)),
+    Orders("/admin/orders", "orders", true, mapOf("status" to listOf("pending", "confirmed", "cancelled", "refunded", "expired"), "event_id" to null)),
+    Payments("/admin/payments", "payments", true, mapOf("status" to listOf("succeeded", "failed"), "purpose" to listOf("order", "activation_fee"), "event_id" to null)),
+    Refunds("/admin/refunds", "refunds", true, mapOf("event_id" to null)),
+    Campaigns("/admin/campaigns", "campaigns", true, mapOf("event_id" to null, "active" to listOf("true", "false"))),
 }
 
 data class AdminCsv(val bytes: ByteArray, val fileName: String)
@@ -252,6 +256,10 @@ private fun adminListTitle(list: AdminList): String = when (list) {
     AdminList.Users -> stringResource(Res.string.admin_users)
     AdminList.Events -> stringResource(Res.string.admin_events)
     AdminList.Reports -> stringResource(Res.string.admin_reports)
+    AdminList.Orders -> stringResource(Res.string.admin_orders)
+    AdminList.Payments -> stringResource(Res.string.admin_payments)
+    AdminList.Refunds -> stringResource(Res.string.admin_refunds)
+    AdminList.Campaigns -> stringResource(Res.string.campaigns_title)
 }
 
 @Composable
@@ -259,6 +267,8 @@ private fun filterLabel(key: String): String = when (key) {
     "suspended" -> stringResource(Res.string.admin_filter_suspended)
     "status" -> stringResource(Res.string.admin_filter_status)
     "event_id" -> stringResource(Res.string.admin_filter_event)
+    "purpose" -> stringResource(Res.string.admin_filter_purpose)
+    "active" -> stringResource(Res.string.admin_filter_active)
     else -> key
 }
 
@@ -338,14 +348,15 @@ private fun AdminRow(list: AdminList, row: JsonObject) {
             Text("#${row.id} ${row.text("title").orEmpty()}")
             Text("${row.text("status").orEmpty()} · ${row.text("start_time").orEmpty()} · ${stringResource(Res.string.admin_organizer)} #${row.text("organizer_id").orEmpty()}")
             row.text("venue_name")?.let { Text(it) }
+            row.text("suspended_at")?.let { Text("${stringResource(Res.string.admin_suspended)}: $it · ${row.text("suspension_reason").orEmpty()}", color = MaterialTheme.colorScheme.error) }
         }
         AdminList.Reports -> {
             Text("#${row.id} · ${stringResource(Res.string.support_event)} #${row.text("event_id").orEmpty()} · ${row.text("status").orEmpty()}")
             Text("${row.text("reason").orEmpty()} · ${row.text("created_at").orEmpty()}")
             row.text("details")?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             row.text("reviewed_at")?.let { Text("${stringResource(Res.string.admin_reviewed)}: $it · #${row.text("reviewed_by_user_id").orEmpty()} · ${row.text("review_note").orEmpty()}", style = MaterialTheme.typography.bodySmall) }
-            row.text("suspended_at")?.let { Text("${stringResource(Res.string.admin_suspended)}: $it · ${row.text("suspension_reason").orEmpty()}", color = MaterialTheme.colorScheme.error) }
         }
+        else -> FinanceRow(list, row)
     }
 }
 
@@ -379,6 +390,7 @@ private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, 
                     Text(stringResource(if (status == "dismissed") Res.string.admin_report_dismiss else Res.string.admin_report_action)) } }
             }
         }
+        else -> Unit
     }
 }
 

@@ -693,4 +693,10 @@
     <string name="admin_fee_current">Current activation fee</string>
     <string name="admin_fee_new">New activation fee, KZT (0 or more)</string>
     <string name="admin_save">Save</string>
+    <string name="admin_orders">Orders</string>
+    <string name="admin_payments">Payments</string>
+    <string name="admin_refunds">Refunds</string>
+    <string name="admin_filter_purpose">Purpose</string>
+    <string name="admin_filter_active">Active</string>
+    <string name="admin_row_unreadable">row could not be read</string>
 </resources>
