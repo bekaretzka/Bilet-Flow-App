@@ -101,6 +101,8 @@ fun OrderResultPage(
             modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
         ) {
             TextButton(onClick = onSupport, enabled = !busy) { Text(stringResource(Res.string.support_contact)) }
+            if (confirmed && order.tickets.isNotEmpty()) com.example.biletflow.presentation.documents.DocumentButton(
+                stringResource(Res.string.pdf_order), "/orders/${order.id}/pdf", "order-${order.id}.pdf")
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),

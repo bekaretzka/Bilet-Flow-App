@@ -594,4 +594,10 @@
     <string name="event_duplicate_start">New start, ISO 8601 with offset (moves all dates)</string>
     <string name="event_duplicate_confirm">Create draft</string>
     <string name="event_duplicate_unknown">Result unknown: no new draft found in My events. Nothing was re-sent; check the list before trying again.</string>
+    <string name="pdf_ticket">Ticket PDF: open or share</string>
+    <string name="pdf_order">Order tickets PDF: open or share</string>
+    <string name="pdf_not_printable">This ticket cannot be printed.</string>
+    <string name="pdf_share_failed">No app could open or share the file.</string>
+    <string name="pdf_network">Network error. The file was not downloaded.</string>
+    <string name="pdf_failed">Unable to download the file</string>
 </resources>

@@ -317,6 +317,8 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             }
         }
 
+        val documents = remember(apiClient) { com.example.biletflow.presentation.documents.DocumentDownloader(apiClient, ordersRepository, sessionStore, com.example.biletflow.core.network.apiBaseUrl) }
+        androidx.compose.runtime.CompositionLocalProvider(com.example.biletflow.presentation.documents.LocalDocuments provides documents) {
         Column(Modifier.fillMaxSize()) {
         if(session != null && currentUserState.error != null) {
             Text(stringResource(Res.string.current_user_error))
@@ -562,6 +564,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                     label = { Text(label) },
                 )
             }
+        }
         }
         }
     }

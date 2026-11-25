@@ -594,4 +594,10 @@
     <string name="event_duplicate_start">Новое начало, ISO 8601 со смещением (сдвигает все даты)</string>
     <string name="event_duplicate_confirm">Создать черновик</string>
     <string name="event_duplicate_unknown">Результат неизвестен: новый черновик в «Моих мероприятиях» не найден. Повторно ничего не отправлялось; проверьте список перед новой попыткой.</string>
+    <string name="pdf_ticket">PDF билета: открыть или поделиться</string>
+    <string name="pdf_order">PDF билетов заказа: открыть или поделиться</string>
+    <string name="pdf_not_printable">Билет нельзя распечатать.</string>
+    <string name="pdf_share_failed">Нет приложения, чтобы открыть или отправить файл.</string>
+    <string name="pdf_network">Ошибка сети. Файл не скачан.</string>
+    <string name="pdf_failed">Не удалось скачать файл</string>
 </resources>

@@ -119,6 +119,11 @@ fun TicketQrPage(
             Text(stringResource(Res.string.ticket_qr_status_label), color = Color(0xFF6F6C72))
             Text(ticketStatus(ticket.status), color = Color(0xFF4035D6), fontWeight = FontWeight.Bold)
         }
+        if (ticket.status.lowercase() !in listOf("cancelled", "refunded")) {
+            Spacer(Modifier.height(12.dp))
+            com.example.biletflow.presentation.documents.DocumentButton(stringResource(Res.string.pdf_ticket),
+                "/tickets/${ticket.id}/pdf", "ticket-${ticket.id}.pdf")
+        }
         Spacer(Modifier.height(24.dp))
     }
 }
