@@ -1,0 +1,22 @@
+Verification: repeated check-in is rejected without a second admission
+Date: 2026-11-26, Astana time. Mobile version: tag v1.0-demo (af7a75f).
+Backend: repository BiletFlow-main, run locally (WSL, uvicorn, PostgreSQL 16 in Docker), data from scripts/seed_demo.py --reset.
+Account: staff@demo.example.com (check-in staff, assigned to the event). Event 6 «Almaty Tech Meetup: AI in Production».
+
+1) In the Android app (video v1.0-demo_2026-11-26_checkin-journey.mp4, screenshots 03-05):
+   staff searched «Dana», ticket #62 status valid -> Mark entry -> confirmed.
+   API log:  POST /events/6/check-in  200
+   App:      «Entry registered. Admit the attendee.», ticket status Checked in,
+             «Scanned at 26.11.2026 · 04:45 (UTC+5) by staff@demo.example.com»
+   Stats:    checked in 4 -> 5, not checked in 3 -> 2
+
+2) Same ticket checked in again with the same staff account (API call, same request the app sends):
+   before:  {"registered":7,"checked_in":5,"not_checked_in":2,"cancelled":0,"refunded":0}
+   POST /events/6/check-in {"code":"T-9tr3ZTSNi44ihObmjdMT0A"}
+   answer:  {"result":"already_checked_in","message":"This ticket was already used",
+             "ticket":{"id":62,"status":"checked_in","checked_in_at":"2026-11-25T23:45:54Z","checked_in_by":"staff@demo.example.com", ...}}
+   after:   {"registered":7,"checked_in":5,"not_checked_in":2,"cancelled":0,"refunded":0}
+
+Result: expected = rejected, no new admission; actual = already_checked_in, counters unchanged.
+In the app this answer is shown by the scanner as the yellow full-screen «Already checked in».
+Not shown on video: the camera scan itself (the demo laptop has no webcam; the emulator camera could not be aimed at the QR).

@@ -43,7 +43,7 @@ Retrying could not create a second admission (the server rejects it), but the st
 | --- | --- | --- | --- |
 | 89 shared host tests (`:shared:testAndroidHostTest`): API contract parsing, session refresh, check-in, campaigns, support | `v1.0-demo` | all pass | 89 / 89 pass |
 | Android app against the real backend (repo `BiletFlow-main`, local, Postgres 16, `seed_demo.py`) | `v1.0-demo` | catalogue, staff login, check-in list and live stats come from the API | confirmed; requests visible in the API log |
-| Repeated check-in of the same ticket | `v1.0-demo` | second attempt rejected, stats do not change | see demo / backup video |
+| Repeated check-in of the same ticket | `v1.0-demo` | second attempt rejected, stats do not change | `already_checked_in`, stats stay 5 / 2 (`docs/presentation/v1.0-demo_2026-11-26_repeated-checkin-rejected.txt`) |
 
 **Not verified:** iOS build (needs a Mac); the deployed Render API (it is a different API version: `/api/v1`, UUID ids);
 camera scanning on the emulator (no webcam on the demo laptop — the demo uses manual check-in, the same API call).
@@ -61,8 +61,17 @@ camera scanning on the emulator (no webcam on the demo laptop — the demo uses 
 1. Log in as staff → **Check-in** → «Almaty Tech Meetup» (tag «Entry open»).
 2. Stats: 7 total, 4 checked in, 3 left.
 3. Find «Dana Omarova» → **Check in** → result «checked in»; stats become 5 / 2.
-4. **Failure case:** check in the same ticket again → «Already checked in» with the time and the staff email;
-   stats stay 5 / 2 — no second admission is created.
+4. **Failure case:** present the same ticket again → the server answers `already_checked_in`; the scanner shows the
+   yellow «Already checked in» with the time and the staff email; stats stay 5 / 2 — no second admission is created.
+   After a manual check-in the app offers only «Undo check-in» for that ticket (as in Figma), so the repeat is shown
+   with a camera scan (a phone) or with the recorded API check (backup file below).
+
+## Backup evidence (docs/presentation/)
+
+- `v1.0-demo_2026-11-26_checkin-journey.mp4` — staff finds the attendee, marks entry, stats 4 → 5 (real local backend)
+- `v1.0-demo_2026-11-26_0*.png` — catalogue in Astana time, attendee valid, confirm dialog, checked in with stats 5 / 7
+- `v1.0-demo_2026-11-26_repeated-checkin-rejected.txt` — repeated check-in rejected, counters unchanged
+- `c9db413_2026-11-26_0*.png` — staff event list and scanner camera, taken on the previous build (times there are still UTC)
 
 ## Known limitations
 
