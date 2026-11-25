@@ -749,4 +749,12 @@
     <string name="admin_reject_organizer">Отклонить заявку</string>
     <string name="admin_open_user">Открыть пользователя (для блокировки)</string>
     <string name="admin_organizer_status_invalid">Отклонить можно только заявку на рассмотрении</string>
+    <string name="check_scanned_by">Отсканирован %1$s, сотрудник %2$s</string>
+    <string name="catalog_price_from">от %1$s ₸</string>
+    <string name="catalog_tickets_left">Осталось билетов: %1$d</string>
+    <string name="catalog_sold_out">Билеты распроданы</string>
+    <string name="support_history_log">История</string>
+    <string name="support_history_status">Статус: %1$s → %2$s (%3$s)</string>
+    <string name="support_history_assigned">Назначено: %1$s (%2$s)</string>
+    <string name="support_history_nobody">никто</string>
 </resources>

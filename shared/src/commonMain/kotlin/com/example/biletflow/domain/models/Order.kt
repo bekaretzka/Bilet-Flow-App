@@ -64,4 +64,19 @@ data class Order(
     @SerialName("refunded_at") val refundedAt: String? = null,
     val items: List<OrderItem> = emptyList(),
     val tickets: List<Ticket> = emptyList(),
+    /** OrderEvent: enough to show the order even after the event is cancelled or suspended. */
+    val event: OrderEvent? = null,
+)
+
+@Serializable
+data class OrderEvent(
+    val id: Int,
+    val title: String,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String? = null,
+    @SerialName("venue_name") val venueName: String? = null,
+    @SerialName("venue_address") val venueAddress: String? = null,
+    val status: String? = null,
+    @SerialName("image_url") val imageUrl: String? = null,
+    @SerialName("cancelled_at") val cancelledAt: String? = null,
 )

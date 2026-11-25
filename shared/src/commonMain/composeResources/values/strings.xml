@@ -749,4 +749,12 @@
     <string name="admin_reject_organizer">Reject application</string>
     <string name="admin_open_user">Open user (to suspend)</string>
     <string name="admin_organizer_status_invalid">Only a pending application can be rejected</string>
+    <string name="check_scanned_by">Scanned at %1$s by %2$s</string>
+    <string name="catalog_price_from">from %1$s ₸</string>
+    <string name="catalog_tickets_left">%1$d tickets left</string>
+    <string name="catalog_sold_out">Sold out</string>
+    <string name="support_history_log">History</string>
+    <string name="support_history_status">Status: %1$s → %2$s (by %3$s)</string>
+    <string name="support_history_assigned">Assigned to %1$s (by %2$s)</string>
+    <string name="support_history_nobody">nobody</string>
 </resources>

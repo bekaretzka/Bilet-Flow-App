@@ -24,6 +24,9 @@ data class Event(
     @SerialName("suspended_at") val suspendedAt: String? = null,
     @SerialName("suspension_reason") val suspensionReason: String? = null,
     val lifecycle: String = "",
+    /** EventListItem (GET /events): cheapest visible type (0 = free) and tickets left; null when there are no ticket types. */
+    @SerialName("min_price") val minPrice: Long? = null,
+    @SerialName("tickets_remaining") val ticketsRemaining: Int? = null,
 )
 
 @Serializable

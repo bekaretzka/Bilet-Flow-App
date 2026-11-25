@@ -33,6 +33,8 @@ data class EventAttendee(
     @SerialName("order_id") val orderId: Int,
     @SerialName("buyer_email") val buyerEmail: String? = null,
     @SerialName("created_at") val createdAt: String,
+    @SerialName("checked_in_at") val checkedInAt: String? = null,
+    @SerialName("checked_in_by") val checkedInBy: String? = null,
 )
 
 data class AttendeesState(
@@ -135,6 +137,7 @@ fun AttendeesPage(vm: AttendeesViewModel) {
                             }))
                             Text("${stringResource(Res.string.attendees_ticket)} #${attendee.ticketId} · ${stringResource(Res.string.attendees_order)} #${attendee.orderId}")
                             Text("${stringResource(Res.string.attendees_created)}: ${formatEventDate(attendee.createdAt)}")
+                            attendee.checkedInAt?.let { Text(scannedText(it, attendee.checkedInBy)) }
                         }
                     }
                 }

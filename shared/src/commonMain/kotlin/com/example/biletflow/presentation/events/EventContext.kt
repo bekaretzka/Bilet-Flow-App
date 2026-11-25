@@ -15,9 +15,10 @@ suspend fun loadEventContext(repository:EventsRepository,id:Int):EventContext = 
     if(error is CancellationException) throw error
     EventContext(id,unavailable=(error as? EventsApiException)?.statusCode==404)
 }
-/** Supplemental only: failure must never replace the surrounding order, QR or support case. */
+/** Supplemental only: failure must never replace the surrounding order, QR or support case. [known]: a title the response already carries (Order.event), no request then. */
 @Composable
-fun EventContextCaption(id:Int,repository:EventsRepository?) {
+fun EventContextCaption(id:Int,repository:EventsRepository?,known:String?=null) {
+    if(known != null) { Text(known); return }
     val context by produceState(EventContext(id),id,repository) {
         value=if(repository==null) EventContext(id) else loadEventContext(repository,id)
     }

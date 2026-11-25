@@ -94,7 +94,7 @@ fun OrderResultPage(
         modifier = Modifier.fillMaxSize().background(PageBackground).statusBarsPadding().padding(24.dp),
     ) {
         Spacer(Modifier.height(28.dp))
-        EventContextCaption(order.eventId,eventsRepository)
+        EventContextCaption(order.eventId,eventsRepository,order.event?.let { e -> listOfNotNull(e.title, e.venueName).joinToString(" · ") })
         Text(stringResource(Res.string.order_result_title), color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
         Column(

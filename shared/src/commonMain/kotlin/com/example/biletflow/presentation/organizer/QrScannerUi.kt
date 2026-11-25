@@ -76,6 +76,7 @@ fun QrScannerPage(vm: CheckInOverviewViewModel) {
                             color = if (result.result == "checked_in") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Text(stringResource(checkInResultLabel(result.result)), style = MaterialTheme.typography.titleLarge)
                         result.ticket?.let { Text("${it.attendeeName.orEmpty()} · ${it.ticketTypeName.orEmpty()} · #${it.id}") }
+                        result.ticket?.takeIf { result.result == "already_checked_in" }?.let { t -> t.checkedInAt?.let { Text(scannedText(it, t.checkedInBy)) } }
                     }
                     if (state.campaignQr) {
                         Text("!", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.error)

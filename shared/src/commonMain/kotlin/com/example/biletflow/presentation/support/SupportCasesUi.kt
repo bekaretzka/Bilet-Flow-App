@@ -416,6 +416,18 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
                         if(it.code=="InvalidSupportAssigneeError") stringResource(Res.string.support_assignee_invalid) else supportFailureText(it),color=MaterialTheme.colorScheme.error)}
                     if(state.assignUnknown) Text(stringResource(Res.string.support_assign_unknown),color=MaterialTheme.colorScheme.error)
                 }
+                if(record.history.isNotEmpty()) item {
+                    Text(stringResource(Res.string.support_history_log),style=MaterialTheme.typography.titleSmall)
+                    record.history.forEach {h ->
+                        val who=h.actorUserId?.let {if(it==state.myId) stringResource(Res.string.support_assignee_me) else "#$it"} ?: "—"
+                        Text(if(h.action=="assigned") stringResource(Res.string.support_history_assigned,
+                                h.assignedUserId?.let {if(it==state.myId) stringResource(Res.string.support_assignee_me) else "#$it"} ?: stringResource(Res.string.support_history_nobody),who)
+                            else stringResource(Res.string.support_history_status,h.fromStatus?.let {supportStatusLabel(it)} ?: "—",
+                                h.toStatus?.let {supportStatusLabel(it)} ?: "—",who),
+                            style=MaterialTheme.typography.bodySmall)
+                        Text(h.createdAt,style=MaterialTheme.typography.labelSmall)
+                    }
+                }
                 if(record.messages.isEmpty()) item {Text(stringResource(Res.string.support_messages_empty))}
                 items(record.messages,key={it.id}) {message ->
                     Card(Modifier.fillMaxWidth()) {Column(Modifier.padding(12.dp)) {

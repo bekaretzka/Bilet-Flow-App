@@ -132,7 +132,7 @@ private fun OrderHistoryCard(
                 )
                 if (isOpening) CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
             }
-            EventContextCaption(order.eventId,eventsRepository)
+            EventContextCaption(order.eventId,eventsRepository,order.event?.let { e -> listOfNotNull(e.title, formatOrderDate(e.startTime), e.venueName).joinToString(" · ") })
             Spacer(Modifier.height(12.dp))
             HistoryRow(stringResource(Res.string.order_history_created), formatOrderDate(order.createdAt))
             Spacer(Modifier.height(7.dp))

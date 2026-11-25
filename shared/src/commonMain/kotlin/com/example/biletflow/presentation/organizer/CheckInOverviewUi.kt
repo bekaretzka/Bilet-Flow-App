@@ -44,6 +44,7 @@ data class ScanTicket(
     @SerialName("ticket_type_name") val ticketTypeName: String?,
     val status: String,
     @SerialName("checked_in_at") val checkedInAt: String? = null,
+    @SerialName("checked_in_by") val checkedInBy: String? = null,
 )
 @Serializable
 data class CheckInResponse(val result: String, val message: String, val ticket: ScanTicket? = null)
@@ -270,6 +271,7 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
                     color = if (result.result == "checked_in") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                 Text(result.message)
                 result.ticket?.let { Text("${it.attendeeName.orEmpty()} · ${it.ticketTypeName.orEmpty()} · #${it.id}") }
+                result.ticket?.takeIf { result.result == "already_checked_in" }?.let { t -> t.checkedInAt?.let { Text(scannedText(it, t.checkedInBy)) } }
             }
             state.undoResult?.let { ticket ->
                 Text(stringResource(if (ticket.status == "valid" && ticket.checkedInAt == null) Res.string.undo_success else Res.string.undo_server_result), style = MaterialTheme.typography.titleMedium)
@@ -333,7 +335,7 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
                         "refunded" -> stringResource(Res.string.attendees_refunded)
                         else -> ticket.status
                     })
-                    ticket.checkedInAt?.let { Text("${stringResource(Res.string.check_checked_at)}: ${formatEventDate(it)}") }
+                    ticket.checkedInAt?.let { Text(scannedText(it, ticket.checkedInBy)) }
                     Button(onClick = { vm.askCheckIn(ticket) }, enabled = !state.checkingIn && !state.searching && state.unknownCode == null) {
                         Text(stringResource(Res.string.check_action))
                     }
@@ -363,3 +365,9 @@ internal fun checkInResultLabel(result: String) = when (result) {
     "event_cancelled" -> Res.string.check_result_event_cancelled
     else -> Res.string.check_result_unknown
 }
+
+/** "Scanned at {checked_in_at} by {checked_in_by}"; the staff email is null for older scans. */
+@Composable
+internal fun scannedText(at: String, by: String?): String =
+    if (by.isNullOrBlank()) "${stringResource(Res.string.check_checked_at)}: ${formatEventDate(at)}"
+    else stringResource(Res.string.check_scanned_by, formatEventDate(at), by)

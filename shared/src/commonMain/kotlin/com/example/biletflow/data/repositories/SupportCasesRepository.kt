@@ -24,7 +24,13 @@ data class SupportCase(val id:Int,val kind:String,val category:String,val subjec
     @SerialName("event_id") val eventId:Int?,@SerialName("order_id") val orderId:Int?,@SerialName("ticket_id") val ticketId:Int?,
     @SerialName("assigned_user_id") val assignedUserId:Int?,
     @SerialName("created_at") val createdAt:String,@SerialName("updated_at") val updatedAt:String,
-    val messages:List<SupportCaseMessage> = emptyList())
+    val messages:List<SupportCaseMessage> = emptyList(),
+    /** GET /support/cases/{id} only: status changes and assignments, oldest first. */
+    val history:List<SupportHistoryEntry> = emptyList())
+@Serializable
+data class SupportHistoryEntry(@SerialName("created_at") val createdAt:String,val action:String,
+    @SerialName("actor_user_id") val actorUserId:Int?=null,@SerialName("from_status") val fromStatus:String?=null,
+    @SerialName("to_status") val toStatus:String?=null,@SerialName("assigned_user_id") val assignedUserId:Int?=null)
 /** PATCH /status result; [includesMessages] is false when the body had no messages array, so the caller re-reads the case. */
 data class AdminCandidate(val id:Int,val email:String?)
 data class SupportStatusResult(val case:SupportCase,val includesMessages:Boolean)

@@ -210,6 +210,16 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
                 Text(formatEventDate(event.startTime), color = Muted, fontSize = 14.sp)
                 Spacer(Modifier.height(8.dp))
                 Text(venue, color = Muted, fontSize = 14.sp)
+                event.minPrice?.let { price ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(if (price == 0L) stringResource(Res.string.ticket_price_free)
+                        else stringResource(Res.string.catalog_price_from, price.toString().reversed().chunked(3).joinToString(" ").reversed()),
+                        color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                event.ticketsRemaining?.let { left ->
+                    Text(if (left == 0) stringResource(Res.string.catalog_sold_out) else stringResource(Res.string.catalog_tickets_left, left),
+                        color = if (left == 0) Color(0xFFB3261E) else Muted, fontSize = 13.sp)
+                }
                 Spacer(Modifier.height(16.dp))
                 Text(
                     "${stringResource(Res.string.event_more)} →",
