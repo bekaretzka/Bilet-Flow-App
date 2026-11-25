@@ -15,7 +15,10 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:exported="true"
+            android:launchMode="singleTask"
             android:name=".MainActivity">
+            <!-- App Link intent-filter for https://<web host>/events/... is not added: the website host is unknown
+                 (biletflow.webHost has no default). The filter to add is in docs/deep-links.md. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

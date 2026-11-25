@@ -26,6 +26,9 @@ android {
     defaultConfig {
         buildConfigField("String", "API_LOCAL_URL", "\"${providers.gradleProperty("biletflow.localUrl").getOrElse("http://10.0.2.2:8000")}\"")
         buildConfigField("String", "API_STAGING_URL", "\"${providers.gradleProperty("biletflow.stagingUrl").getOrElse("")}\"")
+        // Website host of event pages (`https://<host>/events/{id}?campaign=...`, backend FRONTEND_URL).
+        // No default: the hosted FRONTEND_URL is not set in backend/deploy.md yet (see docs/deep-links.md).
+        buildConfigField("String", "WEB_HOST", "\"${providers.gradleProperty("biletflow.webHost").getOrElse("")}\"")
         applicationId = "com.example.biletflow"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
