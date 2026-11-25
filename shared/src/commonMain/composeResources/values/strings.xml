@@ -531,4 +531,27 @@
     <string name="campaigns_no_end">No end date</string>
     <string name="campaigns_no_start">No start date</string>
     <string name="campaigns_check_list">Check campaign list</string>
+    <string name="campaigns_active">Active</string>
+    <string name="campaigns_inactive">Switched off</string>
+    <string name="campaigns_reconciling">Checking the campaign list…</string>
+    <string name="campaigns_result_unknown">Result unknown: no matching campaign found in the list. Nothing was re-sent.</string>
+    <string name="campaigns_code_label">Code</string>
+    <string name="campaigns_discount">Discount</string>
+    <string name="campaigns_link_opens">Link opens</string>
+    <string name="campaigns_stats">Statistics</string>
+    <string name="campaigns_stat_orders">Orders</string>
+    <string name="campaigns_stat_tickets">Tickets</string>
+    <string name="campaigns_stat_gross">Gross</string>
+    <string name="campaigns_stat_discount">Discount</string>
+    <string name="campaigns_stat_net">Net</string>
+    <string name="campaigns_fixed_help">The code, discount and ticket types cannot be changed. Switch this campaign off and create a new one.</string>
+    <string name="campaigns_edit">Edit</string>
+    <string name="campaigns_activate">Switch on</string>
+    <string name="campaigns_deactivate">Switch off</string>
+    <string name="campaigns_cancel_edit">Cancel</string>
+    <string name="campaigns_clear_help">Leave a date or the limit blank to clear it.</string>
+    <string name="campaigns_limit_below">Leave blank for unlimited, or enter a whole number not below the current redemptions.</string>
+    <string name="campaigns_edit_unknown">The change may have been saved. Check the current state before editing again.</string>
+    <string name="campaigns_check_state">Check current state</string>
+    <string name="campaigns_code_exists">This code is already used at this event.</string>
 </resources>

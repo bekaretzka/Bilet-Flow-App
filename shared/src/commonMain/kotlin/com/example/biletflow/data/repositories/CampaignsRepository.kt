@@ -68,4 +68,50 @@ class CampaignsRepository(private val client: HttpClient,private val requests: S
         response.check(201)
         response.body<Campaign>().also { require(it.eventId == eventId) }
     }
+    suspend fun get(campaignId:Int):Campaign = requests.request {token ->
+        val response=client.get("$baseUrl/campaigns/$campaignId") {bearerAuth(token)}
+        response.check(200)
+        response.body<Campaign>().also {require(it.id==campaignId)}
+    }
+    /** Only name, starts_at, ends_at, max_redemptions, is_active; JsonNull clears a date or the limit. */
+    suspend fun update(campaignId:Int,patch:JsonObject):Campaign = requests.request {token ->
+        require(patch.keys.all {it in campaignPatchKeys})
+        val response=client.patch("$baseUrl/campaigns/$campaignId") {
+            bearerAuth(token); contentType(ContentType.Application.Json); setBody(patch)
+        }
+        response.check(200)
+        response.body<Campaign>().also {require(it.id==campaignId)}
+    }
 }
+val campaignPatchKeys=setOf("name","starts_at","ends_at","max_redemptions","is_active")
+
+/** Builds a PATCH body with only changed fields. Blank optional values become explicit null. */
+fun campaignPatch(original:Campaign,values:Map<String,String>):Pair<JsonObject,Set<String>> {
+    val errors=mutableSetOf<String>()
+    val out=LinkedHashMap<String,JsonElement>()
+    val name=values["name"]?.trim()
+    if(name!=null && name!=original.name) { if(com.example.biletflow.presentation.support.supportTextLength(name) !in 1..200) errors+="name" else out["name"]=JsonPrimitive(name) }
+    fun date(key:String,old:String?):Instant? {
+        val raw=values[key]?.trim() ?: return old?.let {runCatching {Instant.parse(it)}.getOrNull()}
+        if(raw.isEmpty()) { if(old!=null) out[key]=JsonNull; return null }
+        val parsed=runCatching {Instant.parse(raw)}.getOrNull()
+        if(parsed==null) { errors+=key; return null }
+        if(old==null || runCatching {Instant.parse(old)}.getOrNull()!=parsed) out[key]=JsonPrimitive(raw)
+        return parsed
+    }
+    val start=date("starts_at",original.startsAt); val end=date("ends_at",original.endsAt)
+    if(start!=null && end!=null && end<=start) errors+="ends_at"
+    values["max_redemptions"]?.trim()?.let { raw ->
+        if(raw.isEmpty()) { if(original.maxRedemptions!=null) out["max_redemptions"]=JsonNull }
+        else { val limit=raw.toLongOrNull()
+            if(limit==null || limit<1 || limit<original.redemptionsCount) errors+="max_redemptions"
+            else if(limit!=original.maxRedemptions) out["max_redemptions"]=JsonPrimitive(limit) }
+    }
+    values["is_active"]?.toBooleanStrictOrNull()?.let { if(it!=original.isActive) out["is_active"]=JsonPrimitive(it) }
+    return JsonObject(out) to errors
+}
+
+/** After an unknown POST outcome: a user code identifies the campaign; a generated code needs a new id with the same name and discount. */
+fun findCreatedCampaign(after:List<Campaign>,beforeIds:Set<Int>,input:CampaignCreate):Campaign? =
+    if(input.code!=null) after.firstOrNull {it.code.equals(input.code,ignoreCase=true)}
+    else after.filter {it.id !in beforeIds && it.name==input.name && it.discountType==input.discountType && it.discountValue==input.discountValue}.singleOrNull()

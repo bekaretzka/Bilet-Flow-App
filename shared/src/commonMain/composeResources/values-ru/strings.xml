@@ -531,4 +531,27 @@
     <string name="campaigns_no_end">Без даты окончания</string>
     <string name="campaigns_no_start">Без даты начала</string>
     <string name="campaigns_check_list">Проверить список кампаний</string>
+    <string name="campaigns_active">Активна</string>
+    <string name="campaigns_inactive">Выключена</string>
+    <string name="campaigns_reconciling">Проверяем список кампаний…</string>
+    <string name="campaigns_result_unknown">Результат неизвестен: подходящая кампания в списке не найдена. Повторно ничего не отправлялось.</string>
+    <string name="campaigns_code_label">Код</string>
+    <string name="campaigns_discount">Скидка</string>
+    <string name="campaigns_link_opens">Открытий ссылки</string>
+    <string name="campaigns_stats">Статистика</string>
+    <string name="campaigns_stat_orders">Заказы</string>
+    <string name="campaigns_stat_tickets">Билеты</string>
+    <string name="campaigns_stat_gross">Выручка</string>
+    <string name="campaigns_stat_discount">Скидка</string>
+    <string name="campaigns_stat_net">Итого</string>
+    <string name="campaigns_fixed_help">Код, скидку и типы билетов изменить нельзя. Выключите кампанию и создайте новую.</string>
+    <string name="campaigns_edit">Изменить</string>
+    <string name="campaigns_activate">Включить</string>
+    <string name="campaigns_deactivate">Выключить</string>
+    <string name="campaigns_cancel_edit">Отмена</string>
+    <string name="campaigns_clear_help">Оставьте дату или лимит пустыми, чтобы очистить их.</string>
+    <string name="campaigns_limit_below">Оставьте пустым для безлимита или укажите целое число не меньше текущих использований.</string>
+    <string name="campaigns_edit_unknown">Изменение могло сохраниться. Проверьте текущее состояние перед новым изменением.</string>
+    <string name="campaigns_check_state">Проверить текущее состояние</string>
+    <string name="campaigns_code_exists">Такой код уже есть в этом мероприятии.</string>
 </resources>
