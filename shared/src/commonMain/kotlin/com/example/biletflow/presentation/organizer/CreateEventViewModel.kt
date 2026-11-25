@@ -22,7 +22,10 @@ data class CreateEventState(val open: Boolean = false, val values: Map<String,St
     val errors: Map<String,String> = emptyMap(), val saving: Boolean = false,
     val failed: Boolean = false, val unknown: Boolean = false, val denied: Boolean = false,
     val created: Event? = null, val editingId: Int? = null, val original: Map<String,String> = emptyMap(),
-    val copyingFromId: Int? = null)
+    val copyingFromId: Int? = null, val editingStatus: String? = null) {
+    /** Backend PATCH /events rejects a published event without venue (EventNotReadyToPublishError), so the form never offers clearing it. */
+    val venueRequired: Boolean get() = editingId != null && editingStatus == "published"
+}
 
 class CreateEventViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
     private val session: SessionStore, private val baseUrl: String = apiBaseUrl) : ViewModel() {
@@ -43,7 +46,7 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
             "start_time" to event.startTime, "end_time" to event.endTime,
             "registration_opens_at" to event.registrationOpensAt.orEmpty(),
             "registration_closes_at" to event.registrationClosesAt.orEmpty())
-        mutable.value = CreateEventState(open = true, values = values, original = values, editingId = event.id)
+        mutable.value = CreateEventState(open = true, values = values, original = values, editingId = event.id, editingStatus = event.status)
     }
     fun copySettings(event: Event) {
         edit(event)
@@ -83,7 +86,8 @@ class CreateEventViewModel(private val client: HttpClient, private val requests:
     fun save() {
         val current = mutable.value
         if (current.saving || current.unknown || current.created != null) return
-        val errors = validateEventForm(current.values)
+        val errors = validateEventForm(current.values) + if (!current.venueRequired) emptyMap() else
+            listOf("venue_name", "venue_address").filter { current.values[it].isNullOrBlank() }.associateWith { "venue_published" }
         if (errors.isNotEmpty()) { mutable.value = current.copy(errors = errors); return }
         val expected = session.generation
         val requestId = ++sequence

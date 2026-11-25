@@ -54,6 +54,7 @@
     <string name="create_opens">Registration opens (optional)</string>
     <string name="create_closes">Registration closes (optional)</string>
     <string name="create_required">Required field</string>
+    <string name="create_venue_published">A published event must keep its venue and address</string>
     <string name="create_date_error">Choose a valid date and time</string>
     <string name="create_order_error">Must be later than the start</string>
     <string name="create_number_error">Enter a whole number from 1</string>

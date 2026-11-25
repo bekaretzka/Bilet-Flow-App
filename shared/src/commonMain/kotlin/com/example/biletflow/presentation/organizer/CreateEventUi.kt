@@ -31,7 +31,8 @@ fun CreateEventPage(vm: CreateEventViewModel, onCheckList: () -> Unit) {
         Text(stringResource(Res.string.event_offsets))
         (listOf("title") + eventDateFields.take(2) + eventTextFields.drop(1) + eventDateFields.drop(2)).forEach { key ->
             val error = state.errors[key]
-            val label = stringResource(labels.getValue(key))
+            val label = stringResource(labels.getValue(key)) +
+                if (state.venueRequired && key in listOf("venue_name", "venue_address")) " *" else ""
             if (key in eventDateFields) {
                 EventDateInput(label, state.values[key].orEmpty(), !state.saving) { vm.update(key, it) }
             } else OutlinedTextField(
@@ -45,6 +46,7 @@ fun CreateEventPage(vm: CreateEventViewModel, onCheckList: () -> Unit) {
                 "order" -> Res.string.create_order_error
                 "number" -> Res.string.create_number_error
                 "length" -> Res.string.create_length_error
+                "venue_published" -> Res.string.create_venue_published
                 else -> Res.string.create_invalid
             }), color = MaterialTheme.colorScheme.error)
         }

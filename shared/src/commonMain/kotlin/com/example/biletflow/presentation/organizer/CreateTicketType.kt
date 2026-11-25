@@ -195,7 +195,7 @@ class CreateTicketTypeViewModel(private val client: HttpClient, private val requ
         val payload = buildJsonObject {
             current.values.forEach { (key,raw) ->
                 val value = raw.trim()
-                if (current.editing != null && value == current.original[key]) return@forEach
+                if (current.editing != null && value == current.original[key]?.trim()) return@forEach
                 when {
                     key == "max_per_order" && value.isEmpty() -> Unit
                     key in listOf("price","quantity","max_per_order") -> put(key,value.toInt())

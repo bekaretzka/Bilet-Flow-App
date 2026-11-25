@@ -54,6 +54,7 @@
     <string name="create_opens">Начало регистрации (необязательно)</string>
     <string name="create_closes">Окончание регистрации (необязательно)</string>
     <string name="create_required">Обязательное поле</string>
+    <string name="create_venue_published">У опубликованного мероприятия место и адрес нельзя очистить</string>
     <string name="create_date_error">Выберите дату и время</string>
     <string name="create_order_error">Должно быть позже начала</string>
     <string name="create_number_error">Введите целое число от 1</string>
