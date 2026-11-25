@@ -148,6 +148,11 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         LaunchedEffect(organizerOrdersState.denied) {
             if (organizerOrdersState.denied) { organizerOrdersVm.close(); myEventsVm.close(); organizerVm.load() }
         }
+        val adminVm: com.example.biletflow.presentation.admin.AdminViewModel = viewModel { com.example.biletflow.presentation.admin.AdminViewModel(apiClient, ordersRepository, sessionStore) }
+        val adminState by adminVm.state.collectAsState()
+        // 403 PlatformAdminRequiredError: rights changed on the server; re-read /auth/me (hides the entry) and leave the admin screens.
+        LaunchedEffect(adminState.denied) { if (adminState.denied) { adminVm.close(); currentUserVm.load() } }
+        LaunchedEffect(currentUser?.isPlatformAdmin) { if (currentUser?.isPlatformAdmin == false && adminVm.state.value.open) adminVm.close() }
         val insightsVm: EventInsightsViewModel = viewModel { EventInsightsViewModel(apiClient, ordersRepository, sessionStore) }
         val insightsState by insightsVm.state.collectAsState()
         LaunchedEffect(insightsState.denied) {
@@ -229,7 +234,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
 
         val logout = {
-            campaignsVm.close()
+            campaignsVm.close(); adminVm.close()
             supportHistoryVm.close()
             supportVm.close()
             previousAccount = null
@@ -251,7 +256,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         }
         LaunchedEffect(suspended) {
             if(suspended) {
-                campaignsVm.close(); supportHistoryVm.close(); supportVm.close()
+                campaignsVm.close(); supportHistoryVm.close(); supportVm.close(); adminVm.close()
                 orderHistoryViewModel.close(); orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
                 eventDetailsViewModel.clearSelection(); organizerOrdersVm.close(); salesVm.close(); insightsVm.close(); attendeesVm.close()
                 staffVm.close(); staffEventsVm.close(); checkInVm.close(); paidSalesVm.close(); myEventsVm.close()
@@ -294,7 +299,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         if(suspended) AlertDialog(onDismissRequest=sessionStore::dismissSuspended,
             text={ Text(stringResource(Res.string.session_suspended)) },
             confirmButton={ TextButton(onClick=sessionStore::dismissSuspended) { Text("OK") } })
-        val isRoot = campaignsState.eventId == null && !supportHistoryState.open && !supportState.open && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
+        val isRoot = !adminState.open && campaignsState.eventId == null && !supportHistoryState.open && !supportState.open && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
             campaignsState.eventId != null && !showLogin -> ({ campaignsVm.back() })
             supportHistoryState.open && !showLogin -> ({ supportHistoryVm.back() })
@@ -308,6 +313,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             staffState.eventId != null && !showLogin -> ({ staffVm.close() })
             attendeesState.eventId != null && !showLogin -> ({ attendeesVm.close() })
             paidSalesState.eventId != null && !showLogin -> ({ paidSalesVm.back() })
+            adminState.open && !showLogin -> ({ adminVm.back() })
             ticketCreateState.open && !showLogin -> ({ ticketCreateVm.close() })
             createEventState.open && !showLogin -> ({ createEventVm.close() })
             myEventsState.selectedId != null && !showLogin -> ({ myEventsVm.backToList() })
@@ -381,6 +387,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             staffState.eventId != null && !showLogin -> EventStaffPage(staffVm)
             attendeesState.eventId != null && !showLogin -> AttendeesPage(attendeesVm)
             paidSalesState.eventId != null && !showLogin -> PaidSalesPage(paidSalesVm)
+            adminState.open && !showLogin -> com.example.biletflow.presentation.admin.AdminPage(adminVm)
             ticketCreateState.open && !showLogin -> CreateTicketTypePage(ticketCreateVm)
             createEventState.open && !showLogin -> CreateEventPage(createEventVm) {
                 createEventVm.reset(); myEventsVm.backToList()
@@ -486,7 +493,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                     currentUser?.let { user ->
                         Text("ID: ${user.id}")
                         Text(stringResource(if(user.emailVerified) Res.string.profile_email_verified else Res.string.profile_email_unverified))
-                        if(user.isPlatformAdmin) Text(stringResource(Res.string.profile_admin))
+                        if(user.isPlatformAdmin) { Text(stringResource(Res.string.profile_admin)); Button(onClick=adminVm::open) { Text(stringResource(Res.string.admin_title)) } }
                         when(user.organizer?.status) {
                             "pending" -> Text(stringResource(Res.string.organizer_pending))
                             "approved" -> Text(stringResource(Res.string.organizer_approved))

@@ -638,4 +638,20 @@
     <string name="cover_storage">Хранилище изображений сейчас недоступно. Попробуйте позже.</string>
     <string name="cover_network">Ошибка сети. Проверьте мероприятие перед новой попыткой.</string>
     <string name="cover_failed">Не удалось изменить обложку</string>
+    <string name="admin_title">Админка</string>
+    <string name="admin_users">Пользователи</string>
+    <string name="admin_filter_suspended">Заблокирован</string>
+    <string name="admin_filter_status">Статус</string>
+    <string name="admin_filter_event">ID мероприятия</string>
+    <string name="admin_query">Поиск (число ищет и по ID)</string>
+    <string name="admin_any">Все</string>
+    <string name="admin_csv">CSV</string>
+    <string name="admin_csv_failed">Не удалось выгрузить CSV</string>
+    <string name="admin_total">Найдено</string>
+    <string name="admin_suspended">Заблокирован</string>
+    <string name="admin_denied">Нужны права администратора платформы</string>
+    <string name="admin_invalid">Проверьте введённые значения</string>
+    <string name="admin_action_failed">Действие не выполнено</string>
+    <string name="admin_result_unknown">Результат неизвестен. Текущее состояние перечитано с сервера; проверьте его перед повтором.</string>
+    <string name="admin_done">Готово</string>
 </resources>

@@ -638,4 +638,20 @@
     <string name="cover_storage">Image storage is unavailable now. Try later.</string>
     <string name="cover_network">Network error. Check the event before trying again.</string>
     <string name="cover_failed">Unable to change the cover</string>
+    <string name="admin_title">Admin</string>
+    <string name="admin_users">Users</string>
+    <string name="admin_filter_suspended">Suspended</string>
+    <string name="admin_filter_status">Status</string>
+    <string name="admin_filter_event">Event ID</string>
+    <string name="admin_query">Search (a number also matches the ID)</string>
+    <string name="admin_any">Any</string>
+    <string name="admin_csv">CSV</string>
+    <string name="admin_csv_failed">Unable to export CSV</string>
+    <string name="admin_total">Found</string>
+    <string name="admin_suspended">Suspended</string>
+    <string name="admin_denied">Platform administrator rights are required</string>
+    <string name="admin_invalid">Check the entered values</string>
+    <string name="admin_action_failed">The action was not performed</string>
+    <string name="admin_result_unknown">The result is unknown. The current state was re-read from the server; check it before trying again.</string>
+    <string name="admin_done">Done</string>
 </resources>
