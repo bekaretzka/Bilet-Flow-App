@@ -60,7 +60,9 @@ class CampaignsTest {
             vm.createForm();vm.state.first {!it.typesLoading};assertTrue(vm.state.value.types.all {it.price>0});vm.toggle(1002);assertTrue(vm.state.value.selected.isEmpty())
             vm.update("name","campaign-unknown");vm.update("discount_value","20");vm.save();vm.save();runCurrent();assertEquals(1,posts)
             gate.complete(Unit);vm.state.first {!it.saving};assertTrue(vm.state.value.unknown);assertEquals("campaign-unknown",vm.state.value.values["name"])
-            vm.save();runCurrent();assertEquals(1,posts);vm.reload();vm.state.first {!it.loading};assertEquals(1,vm.state.value.items.size);assertTrue(vm.state.value.unknown)
+            // 53.1: after an unknown outcome the list is re-read once; the generated-code campaign is found by new id + name + discount, without a second POST.
+            vm.save();runCurrent();assertEquals(1,posts);vm.state.first {!it.reconciling};vm.reload();vm.state.first {!it.loading};assertEquals(1,vm.state.value.items.size)
+            assertEquals(1,posts);assertFalse(vm.state.value.unknown);assertEquals("campaign-unknown",vm.state.value.detail?.name)
             store.save(auth.login("empty@biletflow.kz","password123"));runCurrent();assertNull(vm.state.value.eventId);assertTrue(vm.state.value.items.isEmpty());assertTrue(vm.state.value.values.isEmpty())
         } finally {gate.complete(Unit);vm.viewModelScope.cancel();organizer.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
     }
