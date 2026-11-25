@@ -41,7 +41,10 @@ data class SupportCasesState(val open:Boolean=false,val eventId:Int?=null,val ev
     val selectedId:Int?=null,val detail:SupportCase?=null,val myId:Int?=null,
     val draft:String="",val invalidDraft:Boolean=false,val sending:Boolean=false,val sendError:SupportFailure?=null,val sendUnknown:Boolean=false,
     val statusBusy:Boolean=false,val statusError:SupportFailure?=null,val statusUnknown:Boolean=false,val statusDenied:Boolean=false,
-    val unavailable:Boolean=false, val handler:Boolean=false) {
+    val unavailable:Boolean=false, val handler:Boolean=false,
+    val adminInbox:Boolean=false,val kindFilter:String?=null,val statusFilter:String?=null,
+    val assignBusy:Boolean=false,val assignError:SupportFailure?=null,val assignUnknown:Boolean=false,
+    val admins:List<Int>?=null,val adminsError:String?=null,val isAdmin:Boolean=false) {
     /** Being the requester does not revoke independently verified handler rights. */
     val canManageStatus:Boolean get() = handler && !statusDenied && myId!=null && detail!=null
 }
@@ -69,12 +72,16 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
     }}}
     fun open() {close();mutable.value=SupportCasesState(open=true);reload()}
     fun openEvent(id:Int,title:String) {close();mutable.value=SupportCasesState(open=true,eventId=id,eventTitle=title);reload()}
+    /** Platform admin inbox: GET /support/cases/inbox (admins see every case) with optional kind and status. */
+    fun openAdminInbox() {close();mutable.value=SupportCasesState(open=true,adminInbox=true);reload()}
+    fun setInboxFilter(kind:String?,status:String?) {mutable.value=mutable.value.copy(kindFilter=kind,statusFilter=status);reload()}
     fun close() {sequence++;caseStamp++;appliedStamp=caseStamp;job?.cancel();mutable.value=SupportCasesState()}
     fun select(id:Int,fromCreation:Boolean=false) {
         sequence++;job?.cancel();caseStamp++;appliedStamp=caseStamp
         mutable.value=mutable.value.copy(open=true,selectedId=id,fromCreation=fromCreation,detail=null,loading=false,error=null,
             draft=drafts[id].orEmpty(),invalidDraft=false,sending=false,sendError=null,sendUnknown=false,
-            statusBusy=false,statusError=null,statusUnknown=false,statusDenied=false,unavailable=false,handler=false)
+            statusBusy=false,statusError=null,statusUnknown=false,statusDenied=false,unavailable=false,handler=false,
+            assignBusy=false,assignError=null,assignUnknown=false)
         reload()
     }
     fun back() {
@@ -93,7 +100,8 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
         job?.cancel();mutable.value=current.copy(loading=true,error=null)
         job=viewModelScope.launch {
             try {
-                val items=current.eventId?.let {repository.eventInbox(it)} ?: repository.mine()
+                val items=if(current.adminInbox) repository.inbox(current.kindFilter,current.statusFilter)
+                    else current.eventId?.let {repository.eventInbox(it)} ?: repository.mine()
                 if(expected==session.generation && request==sequence) mutable.value=mutable.value.copy(loading=false,items=items.distinctBy {it.id})
             } catch(error:Exception) {
                 if(error is CancellationException) throw error
@@ -123,9 +131,10 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
         val me=myId(expected)
         val item=repository.get(caseId)
         val user=session.user.value
-        val handler=user?.isPlatformAdmin==true || item.kind=="attendee" && item.eventId!=null && user?.organizer?.status=="approved" && repository.ownsEvent(item.eventId,user.organizer.id)
+        // An admin handles every case except the ones they opened themselves; an organizer handles attendee cases of own events.
+        val handler=user?.isPlatformAdmin==true && item.requesterUserId!=me || item.kind=="attendee" && item.eventId!=null && user?.organizer?.status=="approved" && repository.ownsEvent(item.eventId,user.organizer.id)
         if(!live(expected,caseId)) return null
-        if(me!=null) mutable.value=mutable.value.copy(myId=me,handler=handler)
+        if(me!=null) mutable.value=mutable.value.copy(myId=me,handler=handler,isAdmin=user?.isPlatformAdmin==true)
         return item.takeIf {applyCase(expected,caseId,stamp,it)}
     }
     private fun refreshCase(caseId:Int) {
@@ -223,6 +232,45 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
             }
         }
     }
+    /** PATCH /assignee. Unknown result: no retry, the case is re-read (GET case) and shows the server's assignee. */
+    fun assign(userId:Int?) {
+        val current=mutable.value;val caseId=current.selectedId ?: return;val detail=current.detail ?: return
+        if(current.assignBusy || !current.canManageStatus || detail.assignedUserId==userId) return
+        val expected=session.generation;val stamp=++caseStamp
+        mutable.value=current.copy(assignBusy=true,assignError=null,assignUnknown=false)
+        viewModelScope.launch {
+            try {
+                val result=repository.assign(caseId,userId)
+                if(!live(expected,caseId)) return@launch
+                if(result.includesMessages) applyCase(expected,caseId,stamp,result.case)
+                mutable.value=mutable.value.copy(assignBusy=false)
+                if(!result.includesMessages) refreshCase(caseId)
+            } catch(error:Exception) {
+                if(error is CancellationException) throw error
+                if(!live(expected,caseId)) return@launch
+                val failure=failure(error)
+                mutable.value=if(failure!=null) mutable.value.copy(assignBusy=false,assignError=failure,
+                    statusDenied=failure.status==403 && failure.code=="SupportCaseAccessDeniedError" || mutable.value.statusDenied,
+                    unavailable=failure.status==404 && failure.code=="SupportCaseNotFoundError")
+                    else mutable.value.copy(assignBusy=false,assignUnknown=true)
+                if(failure?.status!=404) refreshCase(caseId)
+            }
+        }
+    }
+    /** Other admins for the picker (admin only): /admin/users rows with is_platform_admin=true. */
+    fun loadAdmins() {
+        if(!mutable.value.isAdmin || mutable.value.admins!=null) return
+        val expected=session.generation
+        viewModelScope.launch {
+            try {
+                val ids=repository.admins()
+                if(expected==session.generation) mutable.value=mutable.value.copy(admins=ids,adminsError=null)
+            } catch(error:Exception) {
+                if(error is CancellationException) throw error
+                if(expected==session.generation) mutable.value=mutable.value.copy(adminsError=describe(error))
+            }
+        }
+    }
     /** A definite server answer, or null when the outcome is unknown (transport failure or 5xx). */
     private fun failure(error:Exception):SupportFailure? = when(error) {
         is SupportApiException -> if(error.statusCode>=500) null else SupportFailure(error.statusCode,error.code,error.message)
@@ -288,7 +336,17 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
         item {
             Spacer(Modifier.height(8.dp))
             TextButton(onClick=vm::back) {Text(stringResource(Res.string.support_back))}
-            Text(stringResource(if(state.eventId==null) Res.string.support_history else Res.string.support_event_requests),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(when {state.adminInbox -> Res.string.support_admin_inbox; state.eventId==null -> Res.string.support_history; else -> Res.string.support_event_requests}),style=MaterialTheme.typography.headlineMedium)
+            if(state.adminInbox && state.selectedId==null) {
+                Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                    FilterChip(selected=state.kindFilter==null,onClick={vm.setInboxFilter(null,state.statusFilter)},label={Text(stringResource(Res.string.admin_any))})
+                    listOf("attendee","platform").forEach {kind -> FilterChip(selected=state.kindFilter==kind,onClick={vm.setInboxFilter(kind,state.statusFilter)},label={Text(kind)})}
+                }
+                Column {
+                    FilterChip(selected=state.statusFilter==null,onClick={vm.setInboxFilter(state.kindFilter,null)},label={Text(stringResource(Res.string.admin_any))})
+                    supportStatuses.forEach {status -> FilterChip(selected=state.statusFilter==status,onClick={vm.setInboxFilter(state.kindFilter,status)},label={Text(supportStatusLabel(status))})}
+                }
+            }
             if(state.eventTitle.isNotEmpty()) Text(state.eventTitle)
         }
         if(!authenticated) item {Text(stringResource(Res.string.support_login_prompt));Button(onClick=onLogin) {Text(stringResource(Res.string.auth_login_button))}}
@@ -321,6 +379,30 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
                     }
                     state.statusError?.let {Text(stringResource(Res.string.support_status_failed)+" "+supportFailureText(it),color=MaterialTheme.colorScheme.error)}
                     if(state.statusUnknown) Text(stringResource(Res.string.support_status_unknown),color=MaterialTheme.colorScheme.error)
+                    // assigned_user_id only: "you" for my id, otherwise the bare user id (no names are invented)
+                    Text("${stringResource(Res.string.support_assignee)}: "+when(val assigned=record.assignedUserId) {
+                        null -> stringResource(Res.string.support_assignee_none)
+                        state.myId -> stringResource(Res.string.support_assignee_me)
+                        else -> "${stringResource(Res.string.support_assignee_user)} #$assigned"
+                    })
+                    if(state.canManageStatus) {
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick={vm.assign(state.myId)},enabled=!state.assignBusy && record.assignedUserId!=state.myId) {Text(stringResource(Res.string.support_assign_me))}
+                            OutlinedButton(onClick={vm.assign(null)},enabled=!state.assignBusy && record.assignedUserId!=null) {Text(stringResource(Res.string.support_unassign))}
+                        }
+                        if(state.isAdmin) {
+                            val admins=state.admins
+                            if(admins==null) TextButton(onClick=vm::loadAdmins) {Text(stringResource(Res.string.support_assign_other))}
+                            else admins.filter {it!=state.myId}.forEach {adminId ->
+                                TextButton(onClick={vm.assign(adminId)},enabled=!state.assignBusy && record.assignedUserId!=adminId) {Text("${stringResource(Res.string.support_assign_to)} #$adminId")}
+                            }
+                            state.adminsError?.let {Text(it,color=MaterialTheme.colorScheme.error)}
+                        }
+                        if(state.assignBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    }
+                    state.assignError?.let {Text(stringResource(Res.string.support_assign_failed)+" "+
+                        if(it.code=="InvalidSupportAssigneeError") stringResource(Res.string.support_assignee_invalid) else supportFailureText(it),color=MaterialTheme.colorScheme.error)}
+                    if(state.assignUnknown) Text(stringResource(Res.string.support_assign_unknown),color=MaterialTheme.colorScheme.error)
                 }
                 if(record.messages.isEmpty()) item {Text(stringResource(Res.string.support_messages_empty))}
                 items(record.messages,key={it.id}) {message ->

@@ -387,7 +387,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             staffState.eventId != null && !showLogin -> EventStaffPage(staffVm)
             attendeesState.eventId != null && !showLogin -> AttendeesPage(attendeesVm)
             paidSalesState.eventId != null && !showLogin -> PaidSalesPage(paidSalesVm)
-            adminState.open && !showLogin -> com.example.biletflow.presentation.admin.AdminPage(adminVm, onEventHistory = insightsVm::openHistory)
+            adminState.open && !showLogin -> com.example.biletflow.presentation.admin.AdminPage(adminVm, onEventHistory = insightsVm::openHistory, onSupportInbox = supportHistoryVm::openAdminInbox)
             ticketCreateState.open && !showLogin -> CreateTicketTypePage(ticketCreateVm)
             createEventState.open && !showLogin -> CreateEventPage(createEventVm) {
                 createEventVm.reset(); myEventsVm.backToList()

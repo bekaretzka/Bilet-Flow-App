@@ -58,7 +58,28 @@ class SupportCasesRepository(private val client:HttpClient,private val requests:
         }
     }
     suspend fun mine():List<SupportCase> = read("/support/cases/me")
-    suspend fun inbox():List<SupportCase> = read("/support/cases/inbox")
+    suspend fun inbox(kind:String?=null,status:String?=null):List<SupportCase> = requests.request { token ->
+        val response=client.get("$baseUrl/support/cases/inbox") {bearerAuth(token);kind?.let {parameter("kind",it)};status?.let {parameter("status",it)}}
+        response.checkStatus(200);response.body<List<SupportCase>>()
+    }
+    /** PATCH /support/cases/{id}/assignee {"user_id": id or null}; null unassigns. Never retried automatically. */
+    suspend fun assign(id:Int,userId:Int?):SupportStatusResult = requests.request { token ->
+        val response=client.patch("$baseUrl/support/cases/$id/assignee") {
+            bearerAuth(token);contentType(ContentType.Application.Json);setBody(buildJsonObject { put("user_id",userId) })
+        }
+        response.checkStatus(200)
+        val json=Json.parseToJsonElement(response.bodyAsText()).jsonObject
+        val case=supportJson.decodeFromJsonElement(SupportCase.serializer(),json)
+        require(case.id==id)
+        SupportStatusResult(case,json["messages"] is JsonArray)
+    }
+    /** Platform admins for the assignee picker: GET /admin/users has no is_platform_admin filter, so rows are filtered here. */
+    suspend fun admins():List<Int> = requests.request { token ->
+        val response=client.get("$baseUrl/admin/users") {bearerAuth(token);parameter("limit",200)}
+        response.checkStatus(200)
+        val items=Json.parseToJsonElement(response.bodyAsText()).jsonObject["items"]?.jsonArray.orEmpty()
+        items.mapNotNull { it as? JsonObject }.filter { (it["is_platform_admin"] as? JsonPrimitive)?.booleanOrNull==true }.mapNotNull { (it["id"] as? JsonPrimitive)?.intOrNull }
+    }
     suspend fun eventInbox(eventId:Int):List<SupportCase> = inbox().filter { it.eventId==eventId }
     suspend fun get(id:Int):SupportCase = read<SupportCase>("/support/cases/$id").also { require(it.id==id) }
     suspend fun me():CurrentUser = read("/auth/me")

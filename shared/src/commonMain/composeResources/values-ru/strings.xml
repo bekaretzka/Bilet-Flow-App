@@ -672,4 +672,16 @@
     <string name="admin_report_dismiss">Отклонить</string>
     <string name="admin_report_action">Меры приняты</string>
     <string name="admin_reviewed">Рассмотрена</string>
+    <string name="support_admin_inbox">Входящие обращения</string>
+    <string name="support_assignee">Ответственный</string>
+    <string name="support_assignee_none">не назначен</string>
+    <string name="support_assignee_me">вам</string>
+    <string name="support_assignee_user">пользователь</string>
+    <string name="support_assign_me">Назначить меня</string>
+    <string name="support_unassign">Снять назначение</string>
+    <string name="support_assign_other">Назначить другого админа…</string>
+    <string name="support_assign_to">Назначить пользователя</string>
+    <string name="support_assign_failed">Не удалось изменить ответственного.</string>
+    <string name="support_assignee_invalid">Этот пользователь не может обрабатывать обращение.</string>
+    <string name="support_assign_unknown">Результат неизвестен; обращение перечитано. Проверьте ответственного перед повтором.</string>
 </resources>

@@ -672,4 +672,16 @@
     <string name="admin_report_dismiss">Dismiss</string>
     <string name="admin_report_action">Mark as actioned</string>
     <string name="admin_reviewed">Reviewed</string>
+    <string name="support_admin_inbox">Support inbox</string>
+    <string name="support_assignee">Assignee</string>
+    <string name="support_assignee_none">not assigned</string>
+    <string name="support_assignee_me">you</string>
+    <string name="support_assignee_user">user</string>
+    <string name="support_assign_me">Assign to me</string>
+    <string name="support_unassign">Unassign</string>
+    <string name="support_assign_other">Assign another admin…</string>
+    <string name="support_assign_to">Assign to user</string>
+    <string name="support_assign_failed">Unable to change the assignee.</string>
+    <string name="support_assignee_invalid">This user cannot handle the case.</string>
+    <string name="support_assign_unknown">The result is unknown; the case was re-read. Check the assignee before trying again.</string>
 </resources>

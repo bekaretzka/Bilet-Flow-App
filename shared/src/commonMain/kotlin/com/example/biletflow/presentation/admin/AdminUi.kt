@@ -260,7 +260,7 @@ private fun filterLabel(key: String): String = when (key) {
 }
 
 @Composable
-fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit) {
+fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit, onSupportInbox: () -> Unit) {
     val state by vm.state.collectAsState()
     val sharer = rememberFileSharer()
     LaunchedEffect(state.csv) { state.csv?.let { vm.csvHandled(!sharer.share(it.bytes, it.fileName, "text/csv")) } }
@@ -272,6 +272,7 @@ fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit) {
             list == null -> item {
                 Text(stringResource(Res.string.admin_title), style = MaterialTheme.typography.headlineMedium)
                 AdminList.entries.forEach { entry -> OutlinedButton(onClick = { vm.openList(entry) }, modifier = Modifier.fillMaxWidth()) { Text(adminListTitle(entry)) } }
+                OutlinedButton(onClick = onSupportInbox, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.support_admin_inbox)) }
             }
             selected != null -> item {
                 AdminDetail(vm, state, list, selected, onEventHistory)
