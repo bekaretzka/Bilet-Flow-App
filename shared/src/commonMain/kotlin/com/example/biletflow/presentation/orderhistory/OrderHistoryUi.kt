@@ -200,12 +200,4 @@ private fun historyPrice(value: Long): String = if (value == 0L) {
     )
 }
 
-private fun formatOrderDate(value: String): String {
-    val date = value.substringBefore('T').split('-')
-    val time = value.substringAfter('T', "").take(5)
-    return if (date.size == 3 && time.length == 5) {
-        "${date[2]}.${date[1]}.${date[0]} · $time"
-    } else {
-        value
-    }
-}
+private fun formatOrderDate(value: String): String = com.example.biletflow.presentation.events.formatAstana(value, withZone = false) ?: value

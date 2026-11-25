@@ -6,6 +6,7 @@ import com.example.biletflow.domain.models.Event
 import com.example.biletflow.domain.repositories.EventsRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.datetime.toLocalDateTime
 
 data class EventsUiState(
     val isLoading: Boolean = true, val events: List<Event> = emptyList(), val loadFailed: Boolean = false,
@@ -70,28 +71,21 @@ class EventsViewModel(private val repository: EventsRepository, private val page
     }
 }
 
-internal fun formatEventDate(value: String): String {
-    val timeSeparator = value.indexOf('T')
-    val positiveOffset = value.indexOf('+', startIndex = timeSeparator + 1)
-    val negativeOffset = value.indexOf('-', startIndex = timeSeparator + 1)
-    val offsetIndex = listOf(positiveOffset, negativeOffset).filter { it >= 0 }.minOrNull()
-    val dateAndTime = when {
-        value.endsWith('Z') -> value.dropLast(1)
-        offsetIndex != null -> value.substring(0, offsetIndex)
-        else -> value
-    }
-    val parts = dateAndTime.split('T')
-    if (parts.size != 2) return value
-    val date = parts[0].split('-')
-    val time = parts[1].take(5)
-    if (date.size != 3 || time.length != 5) return value
-    val offset = when {
-        value.endsWith('Z') -> "UTC"
-        offsetIndex != null -> "UTC${value.substring(offsetIndex)}"
-        else -> null
-    }
-    return buildString {
-        append("${date[2]}.${date[1]}.${date[0]} · $time")
-        offset?.let { append(" ($it)") }
-    }
+
+/** Kazakhstan has one time zone, UTC+5, since 2024. A fixed offset avoids old tzdata on devices that still put Almaty at +6. */
+internal val AstanaOffset = kotlinx.datetime.UtcOffset(hours = 5)
+
+/**
+ * Server times are instants (`...Z` or with an offset). They are shown in Astana time, as in Figma «Время Астаны (UTC+5)»:
+ * `25.11.2026 · 02:48 (UTC+5)`. A value that is not an instant is returned unchanged.
+ */
+internal fun formatEventDate(value: String): String = formatAstana(value, withZone = true) ?: value
+
+internal fun formatAstana(value: String, withZone: Boolean): String? {
+    val local = runCatching {
+        kotlinx.datetime.Instant.parse(value.trim()).toLocalDateTime(kotlinx.datetime.FixedOffsetTimeZone(AstanaOffset))
+    }.getOrNull() ?: return null
+    fun two(n: Int) = n.toString().padStart(2, '0')
+    return "${two(local.dayOfMonth)}.${two(local.monthNumber)}.${local.year} · ${two(local.hour)}:${two(local.minute)}" +
+        if (withZone) " (UTC+5)" else ""
 }

@@ -30,7 +30,9 @@ class EventsCatalogTest {
             assertTrue(repo.getEventsPage(q="Сауран").total > 0) // Address is searched by the server.
             val old=EventsRepositoryImpl(createMockEventsHttpClient(publishedFixtureEvents = true),"http://test").getEvents()
             assertEquals(3,old.size); assertNull(old.last().category); assertNull(old.last().venueName)
-            assertEquals("05.12.2026 · 19:00 (UTC+05:00)",formatEventDate(old.first().startTime))
+            assertEquals("05.12.2026 · 19:00 (UTC+5)",formatEventDate(old.first().startTime))
+            assertEquals("26.11.2026 · 02:48 (UTC+5)",formatEventDate("2026-11-25T21:48:12.930854Z"))
+            assertEquals("not a date",formatEventDate("not a date"))
         } finally { client.close() }
     }
     @Test fun firstAndNextPageErrorsRetryTheSameOffsetAndPreserveCards() = runTest {
