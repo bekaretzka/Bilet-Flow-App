@@ -89,8 +89,15 @@ fun LoginPage(
         Spacer(Modifier.height(12.dp))
         FormLabel(stringResource(Res.string.auth_password_label))
         FormField(form.password, viewModel::updatePassword, stringResource(Res.string.auth_password_placeholder), password = true)
-        TextButton(onClick = { }, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+        val forgot by viewModel.forgot.collectAsState()
+        TextButton(onClick = viewModel::forgotPassword, enabled = !forgot.sending && !state.isLoading, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
             Text(stringResource(Res.string.auth_forgot_password), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
+        when {
+            forgot.sending -> Text(stringResource(Res.string.auth_forgot_sending), fontSize = 12.sp)
+            forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = Color(0xFFB3261E), fontSize = 12.sp)
+            forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = Color(0xFFB3261E), fontSize = 12.sp)
+            forgot.message != null -> Text(forgot.message?.ifBlank { null } ?: stringResource(Res.string.auth_forgot_sent), fontSize = 12.sp)
         }
         AuthFeedback(state)
         Spacer(Modifier.height(10.dp))

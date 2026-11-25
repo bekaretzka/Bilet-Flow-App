@@ -50,6 +50,14 @@ class AuthRepositoryImpl(
         if (response.status.value == 200) return response.body()
         throw apiException(response.status.value, response.bodyAsText())
     }
+    override suspend fun forgotPassword(email: String): String {
+        val response = client.post("$baseUrl/auth/forgot-password") {
+            contentType(ContentType.Application.Json)
+            setBody(kotlinx.serialization.json.buildJsonObject { put("email", JsonPrimitive(email.trim().lowercase())) })
+        }
+        if (response.status.value != 200) throw apiException(response.status.value, response.bodyAsText())
+        return runCatching { json.parseToJsonElement(response.bodyAsText()).jsonObject["message"]?.jsonPrimitive?.contentOrNull }.getOrNull().orEmpty()
+    }
     override suspend fun logout(refreshToken: String) {
         val response = client.post("$baseUrl/auth/logout") {
             contentType(ContentType.Application.Json)

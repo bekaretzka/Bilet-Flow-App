@@ -14,7 +14,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 
-data class CurrentUserState(val loading: Boolean = false,val user: CurrentUser? = null,val error: String? = null)
+data class CurrentUserState(val loading: Boolean = false,val user: CurrentUser? = null,val error: String? = null,
+    val resending: Boolean = false,val resendSent: Boolean = false,val resendError: String? = null)
 class CurrentUserViewModel(private val client: HttpClient,private val requests: SessionOrdersRepository,
     private val session: SessionStore,private val baseUrl: String = apiBaseUrl): ViewModel() {
     private val mutable=MutableStateFlow(CurrentUserState())
@@ -32,6 +33,30 @@ class CurrentUserViewModel(private val client: HttpClient,private val requests: 
         job?.cancel()
         mutable.value=mutable.value.copy(loading=false)
         load()
+    }
+    /** POST /auth/resend-verification. 409 EmailAlreadyVerifiedError re-reads /auth/me, which hides the banner. */
+    fun resendVerification() {
+        if(session.tokens.value == null || mutable.value.resending) return
+        val expected=session.generation
+        mutable.value=mutable.value.copy(resending=true,resendError=null,resendSent=false)
+        viewModelScope.launch {
+            try {
+                requests.request { token ->
+                    val response=client.post("$baseUrl/auth/resend-verification") { bearerAuth(token) }
+                    if(response.status.value != 200) {
+                        val body=runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+                        throw OrdersApiException(response.status.value,(body?.get("error") as? JsonPrimitive)?.contentOrNull,"HTTP ${response.status.value}")
+                    }
+                }
+                if(expected == session.generation) mutable.value=mutable.value.copy(resending=false,resendSent=true)
+            } catch(error: Exception) {
+                if(error is CancellationException) throw error
+                if(expected != session.generation) return@launch
+                val api=error as? OrdersApiException
+                if(api?.errorCode == "EmailAlreadyVerifiedError") { mutable.value=mutable.value.copy(resending=false); refreshAfterChange() }
+                else mutable.value=mutable.value.copy(resending=false,resendError=api?.let { "HTTP ${it.statusCode}: ${it.errorCode ?: it.message}" } ?: "network")
+            }
+        }
     }
     fun load() {
         if(session.tokens.value == null || mutable.value.loading) return

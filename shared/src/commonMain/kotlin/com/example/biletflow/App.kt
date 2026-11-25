@@ -349,6 +349,12 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             Text(currentUserState.error.orEmpty())
             TextButton(onClick=currentUserVm::load) { Text(stringResource(Res.string.events_retry)) }
         }
+        if(session != null && currentUser?.emailVerified == false && !showLogin) Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp)) {
+            Text(stringResource(Res.string.email_unverified_banner))
+            TextButton(onClick=currentUserVm::resendVerification, enabled=!currentUserState.resending) { Text(stringResource(Res.string.email_resend)) }
+            if(currentUserState.resendSent) Text(stringResource(Res.string.email_resend_sent))
+            currentUserState.resendError?.let { Text("${stringResource(Res.string.email_resend_failed)} ($it)") }
+        }
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
             campaignsState.eventId != null && !showLogin -> CampaignsPage(campaignsVm)

@@ -606,4 +606,12 @@
     <string name="campaigns_qr_share">Share QR (PNG)</string>
     <string name="campaign_link_invalid">This link is invalid.</string>
     <string name="campaign_link_failed">Unable to open the link. Check the connection.</string>
+    <string name="auth_forgot_sending">Sending…</string>
+    <string name="auth_forgot_enter_email">Enter your email above first.</string>
+    <string name="auth_forgot_failed">Unable to send the request. Try again.</string>
+    <string name="auth_forgot_sent">If an account with this email exists, a reset link is on its way.</string>
+    <string name="email_unverified_banner">Your email is not verified. Open the link from the email we sent you.</string>
+    <string name="email_resend">Resend verification email</string>
+    <string name="email_resend_sent">Verification email sent.</string>
+    <string name="email_resend_failed">Unable to send the email</string>
 </resources>

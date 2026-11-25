@@ -35,6 +35,8 @@ data class AuthUiState(
     val validationError: AuthValidationError? = null,
 )
 
+data class ForgotPasswordState(val sending: Boolean = false, val message: String? = null, val failed: Boolean = false, val invalidEmail: Boolean = false)
+
 class AuthViewModel(
     private val repository: AuthRepository,
     private val sessionStore: SessionStore,
@@ -45,6 +47,24 @@ class AuthViewModel(
     val form: StateFlow<AuthFormState> = _form.asStateFlow()
     private val _page = MutableStateFlow(AuthPage.Login)
     val page: StateFlow<AuthPage> = _page.asStateFlow()
+    private val _forgot = MutableStateFlow(ForgotPasswordState())
+    val forgot: StateFlow<ForgotPasswordState> = _forgot.asStateFlow()
+
+    /** Always shows the same server answer; never concludes whether the account exists. */
+    fun forgotPassword() {
+        if (_forgot.value.sending || _state.value.isLoading) return
+        val email = _form.value.email.trim()
+        if (email.isEmpty() || !email.contains('@')) { _forgot.value = ForgotPasswordState(invalidEmail = true); return }
+        _forgot.value = ForgotPasswordState(sending = true)
+        viewModelScope.launch {
+            _forgot.value = try {
+                ForgotPasswordState(message = repository.forgotPassword(email))
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                ForgotPasswordState(failed = true)
+            }
+        }
+    }
 
     fun updateEmail(value: String) {
         if (_state.value.isLoading) return

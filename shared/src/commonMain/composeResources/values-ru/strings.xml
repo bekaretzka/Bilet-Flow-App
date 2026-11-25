@@ -606,4 +606,12 @@
     <string name="campaigns_qr_share">Поделиться QR (PNG)</string>
     <string name="campaign_link_invalid">Ссылка недействительна.</string>
     <string name="campaign_link_failed">Не удалось открыть ссылку. Проверьте соединение.</string>
+    <string name="auth_forgot_sending">Отправляем…</string>
+    <string name="auth_forgot_enter_email">Сначала введите email выше.</string>
+    <string name="auth_forgot_failed">Не удалось отправить запрос. Попробуйте ещё раз.</string>
+    <string name="auth_forgot_sent">Если аккаунт с таким email существует, ссылка для сброса уже отправлена.</string>
+    <string name="email_unverified_banner">Email не подтверждён. Откройте ссылку из нашего письма.</string>
+    <string name="email_resend">Отправить письмо ещё раз</string>
+    <string name="email_resend_sent">Письмо отправлено.</string>
+    <string name="email_resend_failed">Не удалось отправить письмо</string>
 </resources>
