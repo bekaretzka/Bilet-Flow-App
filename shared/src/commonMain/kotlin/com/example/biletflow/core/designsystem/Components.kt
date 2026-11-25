@@ -33,14 +33,16 @@ fun Tag(text: String, tone: Tone = Tone.Paper, modifier: Modifier = Modifier) =
 @Composable
 fun TicketStatusChip(status: String, label: String = ticketStatusLabel(status), modifier: Modifier = Modifier) {
     val (tone, icon) = when (status) {
-        "valid" -> Tone.Ok to "✓"
-        "checked_in" -> Tone.Info to "✓"
-        "cancelled" -> Tone.Danger to "✕"
-        "refunded" -> Tone.Neutral to "↺"
-        else -> Tone.Neutral to "•"
+        "valid" -> Tone.Ok to Res.drawable.ic_check
+        "checked_in" -> Tone.Info to Res.drawable.ic_check
+        "cancelled" -> Tone.Danger to Res.drawable.ic_close
+        "refunded" -> Tone.Neutral to Res.drawable.ic_refund
+        else -> Tone.Neutral to Res.drawable.ic_warning
     }
     Surface(modifier, shape = RoundedCornerShape(16.dp), color = tone.bg, contentColor = tone.fg) {
-        Text("$icon $label", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            BfIcon(icon, size = 16.dp); Text(label, style = MaterialTheme.typography.labelMedium)
+        }
     }
 }
 
@@ -57,7 +59,9 @@ fun ticketStatusLabel(status: String): String = when (status) {
 @Composable
 fun DemoBanner(text: String, modifier: Modifier = Modifier) =
     Surface(modifier.fillMaxWidth(), shape = BF.radiusControl, color = BF.warnBg, contentColor = BF.warnFg, border = BorderStroke(1.dp, BF.warnLine)) {
-        Text(text, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp))
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BfIcon(Res.drawable.ic_warning, size = 20.dp); Text(text, style = MaterialTheme.typography.labelMedium)
+        }
     }
 
 /** White card with line/default border and radius 16, padding 20 (Figma section cards). */
@@ -66,3 +70,9 @@ fun SectionCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.
     Surface(modifier.fillMaxWidth(), shape = BF.radiusCard, color = BF.surface, border = BorderStroke(1.dp, BF.line)) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
+
+/** Figma icon set «Иконки (24 px, stroke 2)» as vector drawables `ic_*`; the colour follows the surrounding text unless [tint] is given. */
+@Composable
+fun BfIcon(icon: org.jetbrains.compose.resources.DrawableResource, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 24.dp,
+    tint: Color = androidx.compose.material3.LocalContentColor.current, contentDescription: String? = null) =
+    androidx.compose.material3.Icon(org.jetbrains.compose.resources.painterResource(icon), contentDescription, modifier.size(size), tint)

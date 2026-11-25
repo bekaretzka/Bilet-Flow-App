@@ -5,6 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import com.example.biletflow.core.designsystem.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import biletflow.shared.generated.resources.*
 import com.example.biletflow.core.platform.rememberFileSharer
@@ -94,7 +98,11 @@ fun DocumentButton(label: String, path: String, fileName: String, mimeType: Stri
                     if (generation == documents.session.generation) error = (failure as? OrdersApiException)?.let { it.errorCode ?: "HTTP ${it.statusCode}" } ?: "network"
                 } finally { busy = false }
             }
-        }) { if (busy) CircularProgressIndicator() else Text(label) }
+        }, modifier = androidx.compose.ui.Modifier.fillMaxWidth()) {
+            if (busy) CircularProgressIndicator() else {
+                com.example.biletflow.core.designsystem.BfIcon(Res.drawable.ic_download, size = 20.dp); Spacer(androidx.compose.ui.Modifier.width(8.dp)); Text(label)
+            }
+        }
         error?.let { code ->
             Text(when (code) {
                 "TicketNotPrintableError" -> stringResource(Res.string.pdf_not_printable)

@@ -267,7 +267,7 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
             TextButton(onClick = onBack) { Text(stringResource(Res.string.ticket_create_back)) }
             Text(state.event?.title.orEmpty(), style = MaterialTheme.typography.headlineLarge)
             if (state.event?.status == "cancelled") Text(stringResource(Res.string.staff_events_cancelled), color = MaterialTheme.colorScheme.error)
-            Button(onClick = vm::openScanner, enabled = !state.checkingIn && state.unknownCode == null) { Text(stringResource(Res.string.camera_scan)) }
+            Button(onClick = vm::openScanner, enabled = !state.checkingIn && state.unknownCode == null) { com.example.biletflow.core.designsystem.BfIcon(Res.drawable.ic_qr, size = 20.dp); Spacer(Modifier.width(8.dp)); Text(stringResource(Res.string.camera_scan)) }
             if (state.checkingIn) CircularProgressIndicator()
             state.checkInResult?.let { result ->
                 Text(stringResource(checkInResultLabel(result.result)), style = MaterialTheme.typography.titleMedium,

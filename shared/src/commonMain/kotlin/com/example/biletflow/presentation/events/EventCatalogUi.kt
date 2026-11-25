@@ -72,7 +72,8 @@ fun EventCatalogPage(
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             placeholder = { Text(stringResource(Res.string.events_search_placeholder), color = Muted, fontSize = 15.sp) },
-            shape = RoundedCornerShape(16.dp),
+            leadingIcon = { com.example.biletflow.core.designsystem.BfIcon(Res.drawable.ic_search, size = 20.dp, tint = Muted) },
+            shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 unfocusedBorderColor = FieldBorder,
                 focusedBorderColor = Purple,

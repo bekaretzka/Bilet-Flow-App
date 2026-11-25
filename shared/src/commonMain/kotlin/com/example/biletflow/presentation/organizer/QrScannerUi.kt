@@ -143,17 +143,17 @@ private fun StatTile(value: Int, label: String, modifier: Modifier) {
 private fun ScanVerdict(vm: CheckInOverviewViewModel, state: CheckInOverviewState) {
     val result = state.checkInResult?.result
     val (tone, icon, title) = when {
-        state.campaignQr -> Triple(Tone.Warn, "!", Res.string.scan_title_not_ticket)
-        result == "checked_in" -> Triple(Tone.Ok, "✓", Res.string.scan_title_pass)
-        result == "already_checked_in" -> Triple(Tone.Warn, "!", Res.string.scan_title_already)
-        else -> Triple(Tone.Danger, "✕", Res.string.scan_title_stop)
+        state.campaignQr -> Triple(Tone.Warn, Res.drawable.ic_warning, Res.string.scan_title_not_ticket)
+        result == "checked_in" -> Triple(Tone.Ok, Res.drawable.ic_check, Res.string.scan_title_pass)
+        result == "already_checked_in" -> Triple(Tone.Warn, Res.drawable.ic_warning, Res.string.scan_title_already)
+        else -> Triple(Tone.Danger, Res.drawable.ic_close, Res.string.scan_title_stop)
     }
     val ticket = state.checkInResult?.ticket
     Column(Modifier.fillMaxSize().background(BF.paper).verticalScroll(rememberScrollState())) {
         Column(Modifier.fillMaxWidth().background(tone.bg).statusBarsPadding().padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Box(Modifier.size(72.dp).background(tone.fg, CircleShape), contentAlignment = Alignment.Center) {
-                Text(icon, color = BF.onDark, fontSize = 34.sp, fontWeight = FontWeight.Bold)
+                BfIcon(icon, size = 36.dp, tint = BF.onDark)
             }
             Text(stringResource(title), color = tone.fg, fontFamily = HeadingFont, fontWeight = FontWeight.Bold, fontSize = 26.sp, textAlign = TextAlign.Center)
             Text(stringResource(if (state.campaignQr) Res.string.scan_campaign_qr else checkInResultLabel(result.orEmpty())),

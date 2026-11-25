@@ -128,17 +128,17 @@ private fun EventDetailsContent(
         )
         Spacer(Modifier.height(14.dp))
         Text(event.title, color = Ink, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
-        TextButton(onClick = onSupport) { Text(stringResource(Res.string.support_contact)) }
+        TextButton(onClick = onSupport) { com.example.biletflow.core.designsystem.BfIcon(Res.drawable.ic_chat, size = 18.dp); Spacer(Modifier.width(6.dp)); Text(stringResource(Res.string.support_contact)) }
         ReportEventButton(event.id, onLogin)
         Spacer(Modifier.height(22.dp))
         EventInfo(
-            icon = "▣",
+            icon = Res.drawable.ic_calendar,
             title = formatEventDate(event.startTime),
             subtitle = stringResource(Res.string.event_details_ends, formatEventDate(event.endTime)),
         )
         Spacer(Modifier.height(16.dp))
         EventInfo(
-            icon = "⌖",
+            icon = Res.drawable.ic_pin,
             title = event.venueName?.takeIf { it.isNotBlank() }
                 ?: stringResource(Res.string.event_venue_unavailable),
             subtitle = event.venueAddress?.takeIf { it.isNotBlank() }
@@ -439,9 +439,9 @@ private fun EventHeader(onBack: () -> Unit) {
 }
 
 @Composable
-private fun EventInfo(icon: String, title: String, subtitle: String) {
+private fun EventInfo(icon: org.jetbrains.compose.resources.DrawableResource, title: String, subtitle: String) {
     Row(verticalAlignment = Alignment.Top) {
-        Text(icon, color = Purple, fontSize = 23.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(38.dp))
+        com.example.biletflow.core.designsystem.BfIcon(icon, Modifier.padding(end = 12.dp), size = 20.dp, tint = Purple)
         Column(modifier = Modifier.weight(1f)) {
             Text(title, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
