@@ -736,4 +736,17 @@
     <string name="organizer_display_name_save">Сохранить имя</string>
     <string name="organizer_display_name_saved">Публичное имя сохранено</string>
     <string name="organizer_display_name_length">Имя должно быть от 2 до 100 символов</string>
+    <string name="admin_organizers">Заявки организаторов</string>
+    <string name="admin_audit_log">Журнал действий</string>
+    <string name="admin_filter_type">Тип (event, order, organizer…)</string>
+    <string name="admin_filter_action">Действие (например, event.published)</string>
+    <string name="admin_filter_actor">ID пользователя-автора</string>
+    <string name="admin_filter_date_from">С (ГГГГ-ММ-ДД)</string>
+    <string name="admin_filter_date_to">По (ГГГГ-ММ-ДД)</string>
+    <string name="admin_user">Пользователь</string>
+    <string name="admin_actor">Автор</string>
+    <string name="admin_identity_verified">Личность подтверждена</string>
+    <string name="admin_reject_organizer">Отклонить заявку</string>
+    <string name="admin_open_user">Открыть пользователя (для блокировки)</string>
+    <string name="admin_organizer_status_invalid">Отклонить можно только заявку на рассмотрении</string>
 </resources>

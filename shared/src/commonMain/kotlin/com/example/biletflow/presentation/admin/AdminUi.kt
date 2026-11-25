@@ -49,6 +49,9 @@ enum class AdminList(val path: String, val key: String, val hasQ: Boolean, val f
     Payments("/admin/payments", "payments", true, mapOf("status" to listOf("succeeded", "failed"), "purpose" to listOf("order", "activation_fee"), "event_id" to null)),
     Refunds("/admin/refunds", "refunds", true, mapOf("event_id" to null)),
     Campaigns("/admin/campaigns", "campaigns", true, mapOf("event_id" to null, "active" to listOf("true", "false"))),
+    Organizers("/admin/organizers", "organizers", true, mapOf("status" to listOf("pending", "approved", "rejected"))),
+    AuditLog("/admin/audit-log", "audit-log", false, mapOf("type" to null, "action" to null, "actor_user_id" to null, "event_id" to null,
+        "entity_type" to null, "entity_id" to null, "date_from" to null, "date_to" to null)),
 }
 
 data class AdminCsv(val bytes: ByteArray, val fileName: String)
@@ -72,6 +75,13 @@ data class AdminState(
 internal val JsonObject.id: Int? get() = (this["id"] as? JsonPrimitive)?.intOrNull
 internal fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.contentOrNull
 internal fun JsonObject.flag(key: String): Boolean = (this[key] as? JsonPrimitive)?.booleanOrNull == true
+
+/** Free filter text; a date-only date_from/date_to (YYYY-MM-DD) covers the whole day. */
+internal fun filterValue(key: String, value: String): String = when {
+    key == "date_from" && value.length == 10 -> "${value}T00:00:00"
+    key == "date_to" && value.length == 10 -> "${value}T23:59:59"
+    else -> value
+}
 
 /** CSV file name from Content-Disposition (filename*= or filename=), else admin-<list>-<date>.csv. */
 fun adminCsvFileName(disposition: String?, list: String, date: String): String {
@@ -121,7 +131,7 @@ class AdminViewModel(private val client: HttpClient, private val requests: Sessi
     private fun HttpRequestBuilder.listParameters(s: AdminState) {
         val list = s.list ?: return
         s.q.trim().takeIf { list.hasQ && it.isNotEmpty() }?.let { parameter("q", it) }
-        s.filters.forEach { (key, value) -> if (key in list.filters && value.trim().isNotEmpty()) parameter(key, value.trim()) }
+        s.filters.forEach { (key, value) -> if (key in list.filters && value.trim().isNotEmpty()) parameter(key, filterValue(key, value.trim())) }
     }
 
     private fun load(append: Boolean) {
@@ -248,6 +258,7 @@ internal fun adminFailureText(failure: AdminFailure): String = when {
     failure.code == "OrganizerNotFoundError" -> stringResource(Res.string.admin_no_application)
     failure.code == "UserNotFoundError" -> stringResource(Res.string.admin_user_not_found)
     failure.code == "CannotSuspendSelfError" -> stringResource(Res.string.admin_cannot_suspend_self)
+    failure.code == "InvalidOrganizerStatusError" -> stringResource(Res.string.admin_organizer_status_invalid)
     else -> "${stringResource(Res.string.admin_action_failed)} (${failure.code ?: "HTTP ${failure.status}"})"
 }
 
@@ -260,6 +271,8 @@ private fun adminListTitle(list: AdminList): String = when (list) {
     AdminList.Payments -> stringResource(Res.string.admin_payments)
     AdminList.Refunds -> stringResource(Res.string.admin_refunds)
     AdminList.Campaigns -> stringResource(Res.string.campaigns_title)
+    AdminList.Organizers -> stringResource(Res.string.admin_organizers)
+    AdminList.AuditLog -> stringResource(Res.string.admin_audit_log)
 }
 
 @Composable
@@ -269,6 +282,11 @@ private fun filterLabel(key: String): String = when (key) {
     "event_id" -> stringResource(Res.string.admin_filter_event)
     "purpose" -> stringResource(Res.string.admin_filter_purpose)
     "active" -> stringResource(Res.string.admin_filter_active)
+    "type" -> stringResource(Res.string.admin_filter_type)
+    "action" -> stringResource(Res.string.admin_filter_action)
+    "actor_user_id" -> stringResource(Res.string.admin_filter_actor)
+    "date_from" -> stringResource(Res.string.admin_filter_date_from)
+    "date_to" -> stringResource(Res.string.admin_filter_date_to)
     else -> key
 }
 
@@ -304,7 +322,7 @@ fun AdminPage(vm: AdminViewModel, onEventHistory: (Int, String) -> Unit, onSuppo
                     if (list.hasQ) OutlinedTextField(state.q, vm::setQuery, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         label = { Text(stringResource(Res.string.admin_query)) })
                     list.filters.forEach { (key, options) ->
-                        if (options == null) OutlinedTextField(state.filters[key].orEmpty(), { value -> vm.setFilter(key, value.filter(Char::isDigit)) },
+                        if (options == null) OutlinedTextField(state.filters[key].orEmpty(), { value -> vm.setFilter(key, if (key.endsWith("_id")) value.filter(Char::isDigit) else value) },
                             singleLine = true, modifier = Modifier.fillMaxWidth(), label = { Text(filterLabel(key)) })
                         else {
                             Text(filterLabel(key))
@@ -356,6 +374,22 @@ private fun AdminRow(list: AdminList, row: JsonObject) {
             row.text("details")?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             row.text("reviewed_at")?.let { Text("${stringResource(Res.string.admin_reviewed)}: $it · #${row.text("reviewed_by_user_id").orEmpty()} · ${row.text("review_note").orEmpty()}", style = MaterialTheme.typography.bodySmall) }
         }
+        AdminList.Organizers -> {
+            Text("#${row.id} · ${row.text("email").orEmpty()} · ${row.text("status").orEmpty()}")
+            Text("${stringResource(Res.string.admin_user)} #${row.text("user_id").orEmpty()} · ${row.text("display_name") ?: row.text("legal_name") ?: "—"}")
+            row.text("contact_phone")?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            row.text("identity_verified_at")?.let { Text("${stringResource(Res.string.admin_identity_verified)}: $it", style = MaterialTheme.typography.bodySmall) }
+            row.text("rejection_reason")?.let { Text(stringResource(Res.string.organizer_rejection_reason, it), color = MaterialTheme.colorScheme.error) }
+        }
+        AdminList.AuditLog -> {
+            Text("#${row.id} · ${row.text("action").orEmpty()} · ${row.text("created_at").orEmpty()}")
+            Text(row.text("description").orEmpty())
+            Text(listOfNotNull(
+                "${row.text("entity_type").orEmpty()} #${row.text("entity_id") ?: "—"}",
+                row.text("event_id")?.let { "${stringResource(Res.string.support_event)} #$it" },
+                (row.text("actor_email") ?: row.text("actor_user_id")?.let { "#$it" })?.let { "${stringResource(Res.string.admin_actor)}: $it" },
+            ).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+        }
         else -> FinanceRow(list, row)
     }
 }
@@ -390,12 +424,48 @@ private fun AdminDetail(vm: AdminViewModel, state: AdminState, list: AdminList, 
                     Text(stringResource(if (status == "dismissed") Res.string.admin_report_dismiss else Res.string.admin_report_action)) } }
             }
         }
+        AdminList.Organizers -> {
+            val userId = (row["user_id"] as? JsonPrimitive)?.intOrNull ?: return
+            val status = row.text("status")
+            if (status != "approved") OutlinedButton(onClick = { vm.approveOrganizer(userId, organizerRowId = id) }, enabled = !state.busy) {
+                Text(stringResource(Res.string.admin_approve_organizer)) }
+            if (status == "pending") {
+                OutlinedTextField(state.reason, vm::setReason, enabled = !state.busy, isError = state.reasonInvalid, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(Res.string.admin_reason)) }, supportingText = { Text("${state.reason.trim().length}/500") })
+                if (state.reasonInvalid) Text(stringResource(Res.string.admin_reason_invalid), color = MaterialTheme.colorScheme.error)
+                Button(onClick = { vm.rejectOrganizer(id, userId) }, enabled = !state.busy) { Text(stringResource(Res.string.admin_reject_organizer)) }
+            }
+            // an approved organizer is suspended as a user instead of rejected
+            if (status == "approved") OutlinedButton(onClick = { vm.openList(AdminList.Users, q = "$userId") }) { Text(stringResource(Res.string.admin_open_user)) }
+        }
+        AdminList.AuditLog -> {
+            val eventId = (row["event_id"] as? JsonPrimitive)?.intOrNull
+            if (eventId != null) OutlinedButton(onClick = { vm.openList(AdminList.Events, q = "$eventId") }) { Text(stringResource(Res.string.admin_open_event)) }
+        }
         else -> Unit
     }
 }
 
-/** 55.2: there is no list of pending organizer applications in the backend; the admin finds the user by email and approves. */
-fun AdminViewModel.approveOrganizer(userId: Int) {
+/** Organizer answers carry only the profile fields; they are merged into the AdminOrganizer row (email stays). */
+private fun AdminViewModel.mergeOrganizerRow(rowId: Int, result: JsonObject) {
+    if (result.id != rowId) return
+    update { s -> s.copy(items = s.items.map { if (it.id == rowId) JsonObject(it + result) else it }) }
+}
+
+/**
+ * POST /admin/organizers/{user_id}/reject {reason 3-500} → Organizer; pending applications only (409 InvalidOrganizerStatusError).
+ * Unknown result: the organizers list is re-read with q=<user id> and the row is taken from there.
+ */
+fun AdminViewModel.rejectOrganizer(rowId: Int, userId: Int) {
+    val s = state.value
+    if (!validReason(s.reason)) { update { it.copy(reasonInvalid = true) }; return }
+    action(rowId, HttpMethod.Post, "/admin/organizers/$userId/reject", body = buildJsonObject { put("reason", s.reason.trim()) }, replaces = false,
+        verify = { findInList(AdminList.Organizers.path, rowId, mapOf("q" to "$userId")) },
+        onDone = { result -> mergeOrganizerRow(rowId, result); update { it.copy(reason = "") } })
+}
+
+/** 55.2/57.4: PATCH /organizers/{user_id}/approve works on pending and rejected applications. */
+fun AdminViewModel.approveOrganizer(userId: Int, organizerRowId: Int? = null) {
     if (state.value.busy) return
     val expected = generationNow
     update { it.copy(busy = true, actionError = null, actionUnknown = false, actionDone = false, approval = null) }
@@ -406,6 +476,7 @@ fun AdminViewModel.approveOrganizer(userId: Int) {
             if (expected != generationNow) return@launch
             val ok = (result["user_id"] as? JsonPrimitive)?.intOrNull == userId
             update { it.copy(busy = false, actionDone = ok, actionUnknown = !ok, approval = result.text("status")) }
+            if (ok && organizerRowId != null) mergeOrganizerRow(organizerRowId, result)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             if (expected != generationNow) return@launch

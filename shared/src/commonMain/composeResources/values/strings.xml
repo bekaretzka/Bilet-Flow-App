@@ -736,4 +736,17 @@
     <string name="organizer_display_name_save">Save name</string>
     <string name="organizer_display_name_saved">Public name saved</string>
     <string name="organizer_display_name_length">The name must have 2 to 100 characters</string>
+    <string name="admin_organizers">Organizer applications</string>
+    <string name="admin_audit_log">Audit log</string>
+    <string name="admin_filter_type">Type (event, order, organizer…)</string>
+    <string name="admin_filter_action">Action (e.g. event.published)</string>
+    <string name="admin_filter_actor">Actor user ID</string>
+    <string name="admin_filter_date_from">From (YYYY-MM-DD)</string>
+    <string name="admin_filter_date_to">To (YYYY-MM-DD)</string>
+    <string name="admin_user">User</string>
+    <string name="admin_actor">Actor</string>
+    <string name="admin_identity_verified">Identity verified</string>
+    <string name="admin_reject_organizer">Reject application</string>
+    <string name="admin_open_user">Open user (to suspend)</string>
+    <string name="admin_organizer_status_invalid">Only a pending application can be rejected</string>
 </resources>
