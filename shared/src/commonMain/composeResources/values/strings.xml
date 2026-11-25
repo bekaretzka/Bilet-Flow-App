@@ -588,4 +588,10 @@
     <string name="analytics_check_in">Check-in</string>
     <string name="analytics_absent">Absent</string>
     <string name="analytics_over_time">Sales over time</string>
+    <string name="event_duplicate">Duplicate event</string>
+    <string name="event_duplicate_info">The server creates a new draft with the same details and ticket types. Orders, staff and promo codes are not copied. Leave fields blank to keep the title and dates.</string>
+    <string name="event_duplicate_title">New title (optional)</string>
+    <string name="event_duplicate_start">New start, ISO 8601 with offset (moves all dates)</string>
+    <string name="event_duplicate_confirm">Create draft</string>
+    <string name="event_duplicate_unknown">Result unknown: no new draft found in My events. Nothing was re-sent; check the list before trying again.</string>
 </resources>

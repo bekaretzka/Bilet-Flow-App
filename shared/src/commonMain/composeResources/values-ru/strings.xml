@@ -588,4 +588,10 @@
     <string name="analytics_check_in">Вход</string>
     <string name="analytics_absent">Не пришли</string>
     <string name="analytics_over_time">Продажи по дням</string>
+    <string name="event_duplicate">Дублировать мероприятие</string>
+    <string name="event_duplicate_info">Сервер создаст новый черновик с теми же данными и типами билетов. Заказы, персонал и промокоды не копируются. Оставьте поля пустыми, чтобы сохранить название и даты.</string>
+    <string name="event_duplicate_title">Новое название (необязательно)</string>
+    <string name="event_duplicate_start">Новое начало, ISO 8601 со смещением (сдвигает все даты)</string>
+    <string name="event_duplicate_confirm">Создать черновик</string>
+    <string name="event_duplicate_unknown">Результат неизвестен: новый черновик в «Моих мероприятиях» не найден. Повторно ничего не отправлялось; проверьте список перед новой попыткой.</string>
 </resources>

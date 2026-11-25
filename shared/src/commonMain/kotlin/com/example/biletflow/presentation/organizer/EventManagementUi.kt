@@ -46,7 +46,8 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
                 Button(onClick = { onCampaigns(event) }) { Text(stringResource(Res.string.campaigns_title)) }
                 Button(onClick = { onSupport(event) }) { Text(stringResource(Res.string.support_event_requests)) }
                 Button(onClick = { onOrders(event) }) { Text(stringResource(Res.string.organizer_orders_title)) }
-                Button(onClick = { onCopy(event) }, enabled = !state.loading && !state.changingStatus) { Text(stringResource(Res.string.event_copy)) }
+                // Server-side duplicate replaces the old copy-through-form flow (onCopy is kept for API compatibility).
+                Button(onClick = vm::openDuplicate, enabled = !state.loading && !state.changingStatus && !state.duplicating) { Text(stringResource(Res.string.event_duplicate)) }
                 listOfNotNull(event.description, event.category, event.venueName, event.venueAddress,
                     event.capacity?.toString(), event.registrationOpensAt, event.registrationClosesAt, event.refundPolicy)
                     .forEach { Text(it) }
@@ -124,6 +125,23 @@ fun EventManagementPage(vm: MyEventsViewModel, onEdit: (Event) -> Unit, tickets:
         confirmButton = { TextButton(onClick = { hideConfirm = null; tickets.setHidden(ticket,true) }) { Text(stringResource(Res.string.ticket_hide)) } },
         dismissButton = { TextButton(onClick = { hideConfirm = null }) { Text(stringResource(Res.string.auth_close)) } },
     ) }
+    if (state.duplicateOpen && event != null) AlertDialog(
+        onDismissRequest = vm::closeDuplicate,
+        title = { Text(stringResource(Res.string.event_duplicate)) },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(Res.string.event_duplicate_info))
+            OutlinedTextField(state.duplicateTitle, { vm.updateDuplicate(title = it) }, singleLine = true, enabled = !state.duplicating,
+                label = { Text(stringResource(Res.string.event_duplicate_title)) })
+            OutlinedTextField(state.duplicateStart, { vm.updateDuplicate(start = it) }, singleLine = true, enabled = !state.duplicating,
+                isError = state.duplicateStartInvalid, label = { Text(stringResource(Res.string.event_duplicate_start)) })
+            if (state.duplicateStartInvalid) Text(stringResource(Res.string.create_date_error), color = MaterialTheme.colorScheme.error)
+            state.duplicateError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (state.duplicateUnknown && !state.duplicating) Text(stringResource(Res.string.event_duplicate_unknown), color = MaterialTheme.colorScheme.error)
+            if (state.duplicating) CircularProgressIndicator()
+        } },
+        confirmButton = { TextButton(onClick = vm::duplicate, enabled = !state.duplicating && !state.duplicateUnknown) { Text(stringResource(Res.string.event_duplicate_confirm)) } },
+        dismissButton = { TextButton(onClick = vm::closeDuplicate, enabled = !state.duplicating) { Text(stringResource(Res.string.auth_close)) } },
+    )
     if (confirm && event != null) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text(stringResource(if (event.status == "draft") Res.string.event_publish else Res.string.event_unpublish)) },
