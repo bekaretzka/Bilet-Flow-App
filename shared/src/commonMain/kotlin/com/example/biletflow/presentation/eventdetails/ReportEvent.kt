@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.eventdetails
 
+import com.example.biletflow.core.designsystem.TextButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*

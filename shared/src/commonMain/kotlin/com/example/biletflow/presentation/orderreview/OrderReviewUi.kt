@@ -15,12 +15,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,11 +38,11 @@ import com.example.biletflow.domain.models.Order
 import com.example.biletflow.presentation.eventdetails.EventDetailsViewModel
 import org.jetbrains.compose.resources.stringResource
 
-private val PageBackground = Color(0xFFF7F4EC)
-private val Ink = Color(0xFF17171B)
-private val Muted = Color(0xFF6F6C72)
-private val Purple = Color(0xFF4035D6)
-private val FieldBorder = Color(0xFFD9D5CC)
+private val PageBackground = com.example.biletflow.core.designsystem.BF.paper
+private val Ink = com.example.biletflow.core.designsystem.BF.ink
+private val Muted = com.example.biletflow.core.designsystem.BF.muted
+private val Purple = com.example.biletflow.core.designsystem.BF.primary
+private val FieldBorder = com.example.biletflow.core.designsystem.BF.lineField
 
 @Composable
 fun OrderReviewPage(
@@ -85,6 +85,7 @@ fun OrderReviewPage(
                 color = Ink,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
+                fontFamily = com.example.biletflow.core.designsystem.HeadingFont,
             )
             Spacer(Modifier.height(10.dp))
             Text(
@@ -108,7 +109,7 @@ fun OrderReviewPage(
                     if (orderState.error == OrderCreationError.Unauthorized) {
                         Text(
                             stringResource(Res.string.order_error_unauthorized),
-                            color = Color(0xFFB3261E),
+                            color = com.example.biletflow.core.designsystem.BF.dangerFg,
                             fontSize = 14.sp,
                             lineHeight = 20.sp,
                         )
@@ -117,7 +118,7 @@ fun OrderReviewPage(
                     Button(
                         onClick = onLogin,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
                     ) {
                         Text(
@@ -142,7 +143,7 @@ fun OrderReviewPage(
                         singleLine = true,
                         label = { Text(stringResource(Res.string.order_buyer_name)) },
                         supportingText = if (orderState.error == OrderCreationError.InvalidName) {
-                            { Text(stringResource(Res.string.order_buyer_name_error), color = Color(0xFFB3261E)) }
+                            { Text(stringResource(Res.string.order_buyer_name_error), color = com.example.biletflow.core.designsystem.BF.dangerFg) }
                         } else null,
                         isError = orderState.error == OrderCreationError.InvalidName,
                     )
@@ -181,7 +182,7 @@ fun OrderReviewPage(
                             "PromoCodeUsedUpError" -> stringResource(Res.string.promo_used_up)
                             "PromoCodeNotApplicableError" -> stringResource(Res.string.promo_not_applicable)
                             else -> "${stringResource(Res.string.order_error_server)} ($code)"
-                        }, color = Color(0xFFB3261E), fontSize = 14.sp)
+                        }, color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 14.sp)
                     }
                     if (orderState.previewValid(requestItems)) orderState.preview?.let { preview ->
                         Text("${stringResource(Res.string.order_subtotal)}: ${preview.subtotal} ₸", color = Ink)
@@ -205,7 +206,7 @@ fun OrderReviewPage(
                         enabled = requestItems.isNotEmpty() && !orderState.isSubmitting &&
                             orderState.error != OrderCreationError.UnknownResult,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
                     ) {
                         if (orderState.isSubmitting) {
@@ -248,7 +249,7 @@ private fun OrderError(
         OrderCreationError.Server -> stringResource(Res.string.order_error_server)
         OrderCreationError.InvalidName, OrderCreationError.Promo -> return
     }
-    Text(text, color = Color(0xFFB3261E), fontSize = 14.sp, lineHeight = 20.sp)
+    Text(text, color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 14.sp, lineHeight = 20.sp)
     if (error == OrderCreationError.Unauthorized || error == OrderCreationError.Conflict) {
         TextButton(onClick = if (error == OrderCreationError.Unauthorized) onLogin else onConflict) {
             Text(
@@ -275,7 +276,7 @@ private fun ReviewHeader(onBack: () -> Unit) {
         ) {
             Text("‹", color = Ink, fontSize = 32.sp, modifier = Modifier.padding(end = 8.dp))
         }
-        Text("BiletFlow", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Text("BiletFlow", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
     }
 }
 
@@ -285,7 +286,7 @@ private fun ReviewItem(item: SelectedTicket) {
     val lineTotal = unitPrice * item.quantity.toLong()
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, FieldBorder),
     ) {
@@ -332,8 +333,8 @@ private fun ReviewValueRow(label: String, value: String, emphasized: Boolean = f
 private fun ReviewTotal(totalQuantity: Int, total: Long) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFE9E7FF),
+        shape = RoundedCornerShape(16.dp),
+        color = com.example.biletflow.core.designsystem.BF.primarySoft,
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             ReviewValueRow(

@@ -13,12 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.presentation.events.EventContextCaption
 import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
@@ -53,27 +53,27 @@ fun TicketQrPage(
     LaunchedEffect(ticket.id) { viewModel.load(ticket.id) }
 
     Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFF7F4EC))
+        modifier = Modifier.fillMaxSize().background(com.example.biletflow.core.designsystem.BF.paper)
             .statusBarsPadding().padding(horizontal = 24.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("‹", color = Color(0xFF17171B), fontSize = 32.sp) }
-            Text("BiletFlow", color = Color(0xFF17171B), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = onBack) { Text("‹", color = com.example.biletflow.core.designsystem.BF.ink, fontSize = 32.sp) }
+            Text("BiletFlow", color = com.example.biletflow.core.designsystem.BF.ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         }
         Spacer(Modifier.height(20.dp))
         EventContextCaption(ticket.eventId,eventsRepository)
-        Text(stringResource(Res.string.ticket_qr_title), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.ticket_qr_title), fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         Spacer(Modifier.height(8.dp))
         Text(
             typeName ?: stringResource(Res.string.order_ticket_number, ticket.id),
-            color = Color(0xFF6F6C72),
+            color = com.example.biletflow.core.designsystem.BF.muted,
             fontSize = 17.sp,
         )
         Spacer(Modifier.height(4.dp))
-        Text(ticket.attendeeName, color = Color(0xFF6F6C72), fontSize = 15.sp)
+        Text(ticket.attendeeName, color = com.example.biletflow.core.designsystem.BF.muted, fontSize = 15.sp)
         Spacer(Modifier.height(24.dp))
 
         Surface(
@@ -84,7 +84,7 @@ fun TicketQrPage(
             Box(modifier = Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.Center) {
                 when {
                     state.ticketId != ticket.id || state.isLoading ->
-                        CircularProgressIndicator(color = Color(0xFF4035D6))
+                        CircularProgressIndicator(color = com.example.biletflow.core.designsystem.BF.primary)
                     state.pngBytes != null -> {
                         val image = remember(state.pngBytes) {
                             runCatching { requireNotNull(state.pngBytes).decodeToImageBitmap() }.getOrNull()
@@ -97,12 +97,12 @@ fun TicketQrPage(
                                 contentScale = ContentScale.Fit,
                             )
                         } else {
-                            Text(stringResource(Res.string.ticket_qr_load_error), color = Color(0xFFB3261E))
+                            Text(stringResource(Res.string.ticket_qr_load_error), color = com.example.biletflow.core.designsystem.BF.dangerFg)
                         }
                     }
                     state.error == TicketQrError.NotFound ->
-                        Text(stringResource(Res.string.ticket_qr_unavailable), color = Color(0xFF6F6C72))
-                    else -> Text(stringResource(Res.string.ticket_qr_load_error), color = Color(0xFFB3261E))
+                        Text(stringResource(Res.string.ticket_qr_unavailable), color = com.example.biletflow.core.designsystem.BF.muted)
+                    else -> Text(stringResource(Res.string.ticket_qr_load_error), color = com.example.biletflow.core.designsystem.BF.dangerFg)
                 }
             }
         }
@@ -117,15 +117,15 @@ fun TicketQrPage(
         }
         Spacer(Modifier.weight(1f))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(stringResource(Res.string.ticket_qr_status_label), color = Color(0xFF6F6C72))
-            Text(ticketStatus(ticket.status), color = Color(0xFF4035D6), fontWeight = FontWeight.Bold)
+            Text(stringResource(Res.string.ticket_qr_status_label), color = com.example.biletflow.core.designsystem.BF.muted)
+            Text(ticketStatus(ticket.status), color = com.example.biletflow.core.designsystem.BF.primary, fontWeight = FontWeight.Bold)
         }
         if (ticket.status.lowercase() !in listOf("cancelled", "refunded")) {
             Spacer(Modifier.height(12.dp))
             com.example.biletflow.presentation.documents.DocumentButton(stringResource(Res.string.pdf_ticket),
                 "/tickets/${ticket.id}/pdf", "ticket-${ticket.id}.pdf")
         }
-        onSupport?.let { TextButton(onClick = it) { Text(stringResource(Res.string.support_from_ticket), color = Color(0xFF4035D6)) } }
+        onSupport?.let { TextButton(onClick = it) { Text(stringResource(Res.string.support_from_ticket), color = com.example.biletflow.core.designsystem.BF.primary) } }
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -135,8 +135,8 @@ private fun TicketQrAction(text: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(14.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4035D6)),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = com.example.biletflow.core.designsystem.BF.primary),
     ) { Text(text, color = Color.White, fontWeight = FontWeight.Bold) }
 }
 

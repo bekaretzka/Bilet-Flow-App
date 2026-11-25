@@ -1,4 +1,6 @@
 package com.example.biletflow
+import com.example.biletflow.core.designsystem.TextButton
+import com.example.biletflow.core.designsystem.Button
 import biletflow.shared.generated.resources.*
 import com.example.biletflow.presentation.organizer.*
 import com.example.biletflow.presentation.support.*
@@ -51,7 +53,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
     /** Website host whose event pages (`/events/{id}`, Campaign QR `?campaign=`) open the app; blank ignores all links. */
     webHost: String = "",
 ) {
-    MaterialTheme {
+    com.example.biletflow.core.designsystem.BiletFlowTheme {
         var selectedEventId by remember { mutableStateOf<Int?>(null) }
         var showOrderReview by remember { mutableStateOf(false) }
         var showLogin by remember { mutableStateOf(false) }
@@ -75,7 +77,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         LaunchedEffect(sessionStore) { sessionStore.restore() }
         if (restoring) {
             androidx.compose.material3.Text(org.jetbrains.compose.resources.stringResource(biletflow.shared.generated.resources.Res.string.session_restoring))
-            return@MaterialTheme
+            return@BiletFlowTheme
         }
         if (storageError) {
             androidx.compose.material3.AlertDialog(

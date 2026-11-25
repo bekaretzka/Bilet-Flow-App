@@ -18,13 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,12 +43,12 @@ import com.example.biletflow.domain.repositories.EventsRepository
 import com.example.biletflow.presentation.events.formatEventDate
 import org.jetbrains.compose.resources.stringResource
 
-private val PageBackground = Color(0xFFF7F4EC)
-private val Ink = Color(0xFF17171B)
-private val Muted = Color(0xFF6F6C72)
-private val Purple = Color(0xFF4035D6)
-private val FieldBorder = Color(0xFFD9D5CC)
-private val Cover = Color(0xFFDDD7C7)
+private val PageBackground = com.example.biletflow.core.designsystem.BF.paper
+private val Ink = com.example.biletflow.core.designsystem.BF.ink
+private val Muted = com.example.biletflow.core.designsystem.BF.muted
+private val Purple = com.example.biletflow.core.designsystem.BF.primary
+private val FieldBorder = com.example.biletflow.core.designsystem.BF.lineField
+private val Cover = com.example.biletflow.core.designsystem.BF.cover
 
 @Composable
 fun EventDetailsPage(
@@ -115,11 +115,11 @@ private fun EventDetailsContent(
     ) {
         Spacer(Modifier.height(20.dp))
         Box(
-            modifier = Modifier.fillMaxWidth().height(190.dp).background(Cover, RoundedCornerShape(18.dp)),
+            modifier = Modifier.fillMaxWidth().height(190.dp).background(Cover, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(stringResource(Res.string.event_details_cover_placeholder), color = Muted, fontSize = 16.sp)
-            event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxSize().clip(RoundedCornerShape(18.dp))) }
+            event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))) }
         }
         Spacer(Modifier.height(18.dp))
         Tag(
@@ -127,7 +127,7 @@ private fun EventDetailsContent(
                 ?: stringResource(Res.string.event_category_unavailable),
         )
         Spacer(Modifier.height(14.dp))
-        Text(event.title, color = Ink, fontSize = 30.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
+        Text(event.title, color = Ink, fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         TextButton(onClick = onSupport) { Text(stringResource(Res.string.support_contact)) }
         ReportEventButton(event.id, onLogin)
         Spacer(Modifier.height(22.dp))
@@ -153,7 +153,7 @@ private fun EventDetailsContent(
             onContinue = onContinue,
         )
         Spacer(Modifier.height(28.dp))
-        Text(stringResource(Res.string.event_about), color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.event_about), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         Spacer(Modifier.height(12.dp))
         Text(
             event.description?.takeIf { it.isNotBlank() }
@@ -174,7 +174,7 @@ private fun TicketTypesSection(
     onDecrement: (Int) -> Unit,
     onContinue: () -> Unit,
 ) {
-    Text(stringResource(Res.string.event_tickets), color = Ink, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+    Text(stringResource(Res.string.event_tickets), color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
     Spacer(Modifier.height(14.dp))
     when {
         state.areTicketsLoading -> Row(
@@ -192,7 +192,7 @@ private fun TicketTypesSection(
             Button(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
             ) { Text(stringResource(Res.string.events_retry), fontWeight = FontWeight.Bold) }
         }
         state.ticketTypes.isEmpty() -> Text(
@@ -220,12 +220,12 @@ private fun TicketTypesSection(
             Spacer(Modifier.height(16.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFFFFE9CC),
+                shape = RoundedCornerShape(12.dp),
+                color = com.example.biletflow.core.designsystem.BF.warnBg,
             ) {
                 Text(
                     stringResource(Res.string.ticket_selection_updated),
-                    color = Color(0xFF7A4300),
+                    color = com.example.biletflow.core.designsystem.BF.warnFg,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(14.dp),
                 )
@@ -243,7 +243,7 @@ private fun TicketTypesSection(
         Spacer(Modifier.height(16.dp))
         Text(
             stringResource(Res.string.ticket_selection_unavailable),
-            color = Color(0xFFB42B24),
+            color = com.example.biletflow.core.designsystem.BF.dangerFg,
             fontSize = 14.sp,
         )
     }
@@ -261,7 +261,7 @@ private fun TicketTypeCard(
     val selectionLimit = ticketSelectionLimit(ticketType)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, FieldBorder),
     ) {
@@ -302,7 +302,7 @@ private fun TicketTypeCard(
                     TicketSalesStatus.Ended -> stringResource(Res.string.ticket_sales_ended)
                     TicketSalesStatus.Unavailable -> stringResource(Res.string.ticket_sales_unavailable)
                 },
-                color = if (salesStatus == TicketSalesStatus.Available) Muted else Color(0xFFB42B24),
+                color = if (salesStatus == TicketSalesStatus.Available) Muted else com.example.biletflow.core.designsystem.BF.dangerFg,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -342,7 +342,7 @@ private fun CounterButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.width(48.dp).height(48.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (filled) Purple else Color.White,
@@ -360,8 +360,8 @@ private fun CounterButton(
 private fun SelectionSummary(quantity: Int, total: Long, onContinue: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFE9E7FF),
+        shape = RoundedCornerShape(16.dp),
+        color = com.example.biletflow.core.designsystem.BF.primarySoft,
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
@@ -396,7 +396,7 @@ private fun SelectionSummary(quantity: Int, total: Long, onContinue: () -> Unit)
             Button(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
             ) {
                 Text(stringResource(Res.string.order_review_continue), fontWeight = FontWeight.Bold)
@@ -421,9 +421,9 @@ private fun EventHeader(onBack: () -> Unit) {
         TextButton(onClick = onBack, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
             Text("‹", color = Ink, fontSize = 32.sp, modifier = Modifier.padding(end = 8.dp))
         }
-        Text("BiletFlow", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text("BiletFlow", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont, modifier = Modifier.weight(1f))
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             color = Color.White,
             border = BorderStroke(1.dp, FieldBorder),
         ) {
@@ -452,7 +452,7 @@ private fun EventInfo(icon: String, title: String, subtitle: String) {
 
 @Composable
 private fun Tag(text: String) {
-    Surface(shape = RoundedCornerShape(9.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
+    Surface(shape = RoundedCornerShape(8.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
         Text(
             text,
             color = Ink,
@@ -486,7 +486,7 @@ private fun DetailsError(onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
         ) { Text(stringResource(Res.string.events_retry), fontWeight = FontWeight.Bold) }
     }
 }

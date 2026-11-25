@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,7 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,12 +42,12 @@ import com.example.biletflow.domain.models.TicketType
 import com.example.biletflow.domain.repositories.EventsRepository
 import org.jetbrains.compose.resources.stringResource
 
-private val PageBackground = Color(0xFFF7F4EC)
-private val Ink = Color(0xFF17171B)
-private val Muted = Color(0xFF6F6C72)
-private val Purple = Color(0xFF4035D6)
-private val FieldBorder = Color(0xFFD9D5CC)
-private val Cover = Color(0xFFDDD7C7)
+private val PageBackground = com.example.biletflow.core.designsystem.BF.paper
+private val Ink = com.example.biletflow.core.designsystem.BF.ink
+private val Muted = com.example.biletflow.core.designsystem.BF.muted
+private val Purple = com.example.biletflow.core.designsystem.BF.primary
+private val FieldBorder = com.example.biletflow.core.designsystem.BF.lineField
+private val Cover = com.example.biletflow.core.designsystem.BF.cover
 
 @Composable
 fun EventCatalogPage(
@@ -116,7 +116,7 @@ private fun CatalogHeader(onOpenOrders: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("BiletFlow", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text("BiletFlow", color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TextButton(onClick = onOpenOrders) {
                 Text(
@@ -126,7 +126,7 @@ private fun CatalogHeader(onOpenOrders: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Surface(shape = RoundedCornerShape(14.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
+            Surface(shape = RoundedCornerShape(12.dp), color = Color.White, border = BorderStroke(1.dp, FieldBorder)) {
                 Text(
                     text = stringResource(Res.string.language_ru),
                     color = Ink,
@@ -162,7 +162,7 @@ private fun ErrorState(onRetry: () -> Unit) {
         Button(
             onClick = onRetry,
             colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
         ) { Text(stringResource(Res.string.events_retry), fontWeight = FontWeight.Bold) }
     }
 }
@@ -171,8 +171,8 @@ private fun ErrorState(onRetry: () -> Unit) {
 private fun FilterChip(text: String, selected: Boolean, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier.border(1.dp, if (selected) Ink else FieldBorder, RoundedCornerShape(28.dp)),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.border(1.dp, if (selected) Ink else FieldBorder, RoundedCornerShape(20.dp)),
         colors = ButtonDefaults.textButtonColors(
             containerColor = if (selected) Ink else Color.White,
             contentColor = if (selected) Color.White else Ink,
@@ -190,7 +190,7 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, FieldBorder),
     ) {
@@ -205,7 +205,7 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
             Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                 Tag(category)
                 Spacer(Modifier.height(10.dp))
-                Text(event.title, color = Ink, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                Text(event.title, color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
                 Spacer(Modifier.height(8.dp))
                 Text(formatEventDate(event.startTime), color = Muted, fontSize = 14.sp)
                 Spacer(Modifier.height(8.dp))
@@ -218,7 +218,7 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
                 }
                 event.ticketsRemaining?.let { left ->
                     Text(if (left == 0) stringResource(Res.string.catalog_sold_out) else stringResource(Res.string.catalog_tickets_left, left),
-                        color = if (left == 0) Color(0xFFB3261E) else Muted, fontSize = 13.sp)
+                        color = if (left == 0) com.example.biletflow.core.designsystem.BF.dangerFg else Muted, fontSize = 13.sp)
                 }
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -235,7 +235,7 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
 
 @Composable
 private fun Tag(text: String) {
-    Surface(shape = RoundedCornerShape(9.dp), color = PageBackground) {
+    Surface(shape = RoundedCornerShape(8.dp), color = PageBackground) {
         Text(
             text = text,
             color = Muted,

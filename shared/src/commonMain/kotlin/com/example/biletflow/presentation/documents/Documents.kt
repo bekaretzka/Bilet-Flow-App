@@ -2,7 +2,7 @@ package com.example.biletflow.presentation.documents
 
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.example.biletflow.core.designsystem.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.*

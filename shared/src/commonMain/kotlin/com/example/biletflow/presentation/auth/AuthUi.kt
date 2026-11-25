@@ -13,14 +13,14 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,12 +42,12 @@ import com.example.biletflow.domain.repositories.AuthRepository
 import com.example.biletflow.domain.models.AuthTokens
 import com.example.biletflow.domain.session.SessionStore
 
-private val PageBackground = Color(0xFFF7F4EC)
-private val Ink = Color(0xFF17171B)
-private val Muted = Color(0xFF6F6C72)
-private val Purple = Color(0xFF4035D6)
-private val Error = Color(0xFFD24D45)
-private val FieldBorder = Color(0xFFD9D5CC)
+private val PageBackground = com.example.biletflow.core.designsystem.BF.paper
+private val Ink = com.example.biletflow.core.designsystem.BF.ink
+private val Muted = com.example.biletflow.core.designsystem.BF.muted
+private val Purple = com.example.biletflow.core.designsystem.BF.primary
+private val Error = com.example.biletflow.core.designsystem.BF.dangerFg
+private val FieldBorder = com.example.biletflow.core.designsystem.BF.lineField
 
 enum class AuthPage { Login, Registration }
 
@@ -96,8 +96,8 @@ fun LoginPage(
         }
         when {
             forgot.sending -> Text(stringResource(Res.string.auth_forgot_sending), fontSize = 12.sp)
-            forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = Color(0xFFB3261E), fontSize = 12.sp)
-            forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = Color(0xFFB3261E), fontSize = 12.sp)
+            forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 12.sp)
+            forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 12.sp)
             forgot.message != null -> Text(forgot.message?.ifBlank { null } ?: stringResource(Res.string.auth_forgot_sent), fontSize = 12.sp)
         }
         if (forgot.message != null && onResetLink != null) TextButton(onClick = onResetLink, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
@@ -188,7 +188,7 @@ private fun Brand() {
 @Composable
 private fun PageTitle(title: String, subtitle: String) {
     Spacer(Modifier.height(24.dp))
-    Text(title, color = Ink, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+    Text(title, color = Ink, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
     Spacer(Modifier.height(6.dp))
     Text(subtitle, color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
     Spacer(Modifier.height(22.dp))
@@ -215,7 +215,7 @@ private fun FormField(
         placeholder = { Text(placeholder, color = Muted, fontSize = 13.sp) },
         textStyle = TextStyle(color = Ink, fontSize = 14.sp),
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        shape = RoundedCornerShape(9.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Purple,
             unfocusedBorderColor = FieldBorder,
@@ -231,8 +231,8 @@ private fun PrimaryButton(text: String, enabled: Boolean = true, onClick: () -> 
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(44.dp),
-        shape = RoundedCornerShape(9.dp),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
     ) {
         if (enabled) {

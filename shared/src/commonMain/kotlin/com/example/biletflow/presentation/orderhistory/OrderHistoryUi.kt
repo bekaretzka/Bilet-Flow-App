@@ -14,12 +14,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.presentation.events.EventContextCaption
 import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
@@ -47,22 +47,22 @@ fun OrderHistoryPage(
 ) {
     val state by viewModel.state.collectAsState()
     Column(
-        modifier = Modifier.fillMaxSize().background(Color(0xFFF7F4EC))
+        modifier = Modifier.fillMaxSize().background(com.example.biletflow.core.designsystem.BF.paper)
             .statusBarsPadding().padding(horizontal = 24.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("‹", color = Color(0xFF17171B), fontSize = 32.sp) }
-            Text("BiletFlow", color = Color(0xFF17171B), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+            TextButton(onClick = onBack) { Text("‹", color = com.example.biletflow.core.designsystem.BF.ink, fontSize = 32.sp) }
+            Text("BiletFlow", color = com.example.biletflow.core.designsystem.BF.ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
             if (isAuthenticated) {
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onLogout) { Text(stringResource(Res.string.auth_logout)) }
             }
         }
         Spacer(Modifier.height(18.dp))
-        Text(stringResource(Res.string.order_history_title), fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.order_history_title), fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         Spacer(Modifier.height(22.dp))
 
         Column(
@@ -119,9 +119,9 @@ private fun OrderHistoryCard(
         onClick = onClick,
         enabled = !isOpening,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFD9D5CC)),
+        border = BorderStroke(1.dp, com.example.biletflow.core.designsystem.BF.line),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -147,7 +147,7 @@ private fun OrderHistoryCard(
 @Composable
 private fun HistoryRow(label: String, value: String, emphasized: Boolean = false) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Color(0xFF6F6C72), fontSize = 14.sp)
+        Text(label, color = com.example.biletflow.core.designsystem.BF.muted, fontSize = 14.sp)
         Text(value, fontSize = 14.sp, fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium)
     }
 }
@@ -159,8 +159,8 @@ private fun HistoryMessage(text: String, loading: Boolean = false) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        if (loading) CircularProgressIndicator(color = Color(0xFF4035D6))
-        Text(text, color = Color(0xFF6F6C72), fontSize = 16.sp)
+        if (loading) CircularProgressIndicator(color = com.example.biletflow.core.designsystem.BF.primary)
+        Text(text, color = com.example.biletflow.core.designsystem.BF.muted, fontSize = 16.sp)
     }
 }
 
@@ -171,11 +171,11 @@ private fun HistoryAction(message: String, button: String, onClick: () -> Unit) 
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(message, color = Color(0xFF6F6C72), fontSize = 15.sp)
+        Text(message, color = com.example.biletflow.core.designsystem.BF.muted, fontSize = 15.sp)
         Button(
             onClick = onClick,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4035D6)),
-            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = com.example.biletflow.core.designsystem.BF.primary),
+            shape = RoundedCornerShape(12.dp),
         ) { Text(button, color = Color.White, fontWeight = FontWeight.Bold) }
     }
 }

@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import com.example.biletflow.core.designsystem.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.presentation.events.EventContextCaption
 import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
@@ -42,10 +42,10 @@ import com.example.biletflow.domain.models.Order
 import com.example.biletflow.domain.models.Ticket
 import org.jetbrains.compose.resources.stringResource
 
-private val PageBackground = Color(0xFFF7F4EC)
-private val Ink = Color(0xFF17171B)
-private val Muted = Color(0xFF6F6C72)
-private val Purple = Color(0xFF4035D6)
+private val PageBackground = com.example.biletflow.core.designsystem.BF.paper
+private val Ink = com.example.biletflow.core.designsystem.BF.ink
+private val Muted = com.example.biletflow.core.designsystem.BF.muted
+private val Purple = com.example.biletflow.core.designsystem.BF.primary
 
 @Composable
 fun OrderResultPage(
@@ -95,7 +95,7 @@ fun OrderResultPage(
     ) {
         Spacer(Modifier.height(28.dp))
         EventContextCaption(order.eventId,eventsRepository,order.event?.let { e -> listOfNotNull(e.title, e.venueName).joinToString(" · ") })
-        Text(stringResource(Res.string.order_result_title), color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text(stringResource(Res.string.order_result_title), color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
         Spacer(Modifier.height(24.dp))
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
@@ -105,7 +105,7 @@ fun OrderResultPage(
                 stringResource(Res.string.pdf_order), "/orders/${order.id}/pdf", "order-${order.id}.pdf")
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
@@ -169,9 +169,9 @@ fun OrderResultPage(
                         onClick = { showCancelDialog = true },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFB3261E),
+                            containerColor = com.example.biletflow.core.designsystem.BF.dangerFg,
                             contentColor = Color.White,
                         ),
                     ) {
@@ -219,7 +219,7 @@ fun OrderResultPage(
         Button(
             onClick = onDone,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
         ) {
             Text(
@@ -245,7 +245,7 @@ fun OrderResultPage(
                         viewModel.cancel(order)
                     },
                 ) {
-                    Text(stringResource(Res.string.order_cancel_confirm), color = Color(0xFFB3261E))
+                    Text(stringResource(Res.string.order_cancel_confirm), color = com.example.biletflow.core.designsystem.BF.dangerFg)
                 }
             },
             dismissButton = {
@@ -264,7 +264,7 @@ private fun TicketResultCard(ticket: Ticket, typeName: String?, onClick: () -> U
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFD9D5CC)),
+        border = BorderStroke(1.dp, com.example.biletflow.core.designsystem.BF.line),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -303,7 +303,7 @@ private fun PaymentErrorMessage(error: PaymentError?, locallyExpired: Boolean) {
         error == PaymentError.CancellationServer -> stringResource(Res.string.order_cancel_error_server)
         else -> null
     } ?: return
-    Text(text, color = Color(0xFFB3261E), fontSize = 14.sp, lineHeight = 20.sp)
+    Text(text, color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 14.sp, lineHeight = 20.sp)
     Spacer(Modifier.height(12.dp))
 }
 
@@ -318,7 +318,7 @@ private fun ResultActionButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
     ) {
         if (loading) {
