@@ -13,6 +13,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import biletflow.shared.generated.resources.*
+import org.jetbrains.compose.resources.Font
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -69,9 +72,12 @@ object BF {
     val controlHeight = 48.dp
 }
 
-/** Headings: Unbounded in Figma; body: Golos Text. Until the font files are added, the platform font is used. */
-val HeadingFont: FontFamily = FontFamily.Default
-val BodyFont: FontFamily = FontFamily.Default
+/** Headings: Unbounded (Medium, Bold); body: Golos Text (Regular, Medium, SemiBold). OFL fonts from Google Fonts in composeResources/font. */
+val HeadingFont: FontFamily
+    @Composable get() = FontFamily(Font(Res.font.unbounded_medium, FontWeight.Medium), Font(Res.font.unbounded_bold, FontWeight.Bold))
+val BodyFont: FontFamily
+    @Composable get() = FontFamily(Font(Res.font.golos_text_regular, FontWeight.Normal), Font(Res.font.golos_text_medium, FontWeight.Medium),
+        Font(Res.font.golos_text_semibold, FontWeight.SemiBold))
 
 private val colors = lightColorScheme(
     primary = BF.primary, onPrimary = BF.onDark,
@@ -98,7 +104,7 @@ private val colors = lightColorScheme(
 private fun style(font: FontFamily, weight: FontWeight, size: Int, lineHeight: Double) =
     TextStyle(fontFamily = font, fontWeight = weight, fontSize = size.sp, lineHeight = (size * lineHeight).sp)
 
-private val typography = Typography(
+private fun typography(HeadingFont: FontFamily, BodyFont: FontFamily) = Typography(
     displayLarge = style(HeadingFont, FontWeight.Bold, 36, 1.2),
     displayMedium = style(HeadingFont, FontWeight.Bold, 32, 1.2),
     displaySmall = style(HeadingFont, FontWeight.Bold, 30, 1.2),
@@ -126,6 +132,9 @@ private val shapes = Shapes(
 
 @Composable
 fun BiletFlowTheme(content: @Composable () -> Unit) {
+    val heading = HeadingFont
+    val body = BodyFont
+    val typography = remember(heading, body) { typography(heading, body) }
     MaterialTheme(colorScheme = colors, typography = typography, shapes = shapes) {
         Surface(color = BF.paper, contentColor = BF.ink) { content() }
     }
