@@ -48,6 +48,8 @@ import com.example.biletflow.presentation.orderhistory.OrderHistoryViewModel
 @Composable
 fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.domain.session.SessionStorage? = null,
     registerBack: (((() -> Unit)?) -> Unit)? = null,
+    /** A link that opened the app (Campaign QR: `...?campaign=C-...`). Resolved once per distinct link. */
+    initialLink: String? = null,
 ) {
     MaterialTheme {
         var selectedEventId by remember { mutableStateOf<Int?>(null) }
@@ -259,6 +261,28 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 previousAccount=null; selectedTab=0
             }
         }
+        // Campaign QR link: GET /campaign-links/{token} counts an open, so it runs once per link (saved across recreation).
+        var handledLink by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+        var campaignLinkError by remember { mutableStateOf<String?>(null) }
+        LaunchedEffect(initialLink) {
+            val link = initialLink ?: return@LaunchedEffect
+            if (handledLink == link) return@LaunchedEffect
+            handledLink = link
+            val token = com.example.biletflow.data.repositories.campaignTokenFromLink(link) ?: return@LaunchedEffect
+            try {
+                val resolved = com.example.biletflow.data.repositories.resolveCampaignLink(apiClient, com.example.biletflow.core.network.apiBaseUrl, token)
+                orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
+                completedOrder = null; selectedTicketId = null; showOrderReview = false; selectedTab = 0
+                selectedEventId = resolved.eventId
+                resolved.promoCode?.let(orderViewModel::prefillPromoCode)
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                campaignLinkError = (error as? com.example.biletflow.data.repositories.CampaignApiException)?.code ?: "network"
+            }
+        }
+        campaignLinkError?.let { code -> AlertDialog(onDismissRequest = { campaignLinkError = null },
+            text = { Text(stringResource(if (code == "CampaignLinkNotFoundError") Res.string.campaign_link_invalid else Res.string.campaign_link_failed)) },
+            confirmButton = { TextButton(onClick = { campaignLinkError = null }) { Text("OK") } }) }
         if(suspended) AlertDialog(onDismissRequest=sessionStore::dismissSuspended,
             text={ Text(stringResource(Res.string.session_suspended)) },
             confirmButton={ TextButton(onClick=sessionStore::dismissSuspended) { Text("OK") } })

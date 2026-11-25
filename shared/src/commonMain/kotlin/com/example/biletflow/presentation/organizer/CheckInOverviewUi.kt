@@ -60,6 +60,8 @@ data class CheckInOverviewState(
     val confirmingUndo: Boolean = false, val undoOperation: Boolean = false,
     val undoResult: ScanTicket? = null, val undoAbsent: Boolean = false,
     val scannerOpen: Boolean = false, val scannerForeground: Boolean = false, val scannerEpoch: Long = 0,
+    /** A Campaign QR (promo link) was scanned: it is never sent to check-in. */
+    val campaignQr: Boolean = false,
 )
 
 class CheckInOverviewViewModel(
@@ -98,14 +100,15 @@ class CheckInOverviewViewModel(
     fun scannerFrame(epoch: Long, codes: List<String>) {
         val current = mutable.value
         if (epoch != current.scannerEpoch || !current.scannerOpen || !current.scannerForeground || current.checkingIn ||
-            current.checkInResult != null || current.checkInError || current.unknownCode != null || current.verifiedAfterUnknown || current.denied) return
+            current.checkInResult != null || current.checkInError || current.unknownCode != null || current.verifiedAfterUnknown || current.denied || current.campaignQr) return
         val code = frameGate.accept(codes, frameClock.elapsedNow().inWholeMilliseconds) ?: return
+        if (com.example.biletflow.data.repositories.campaignTokenFromLink(code) != null) { mutable.value = current.copy(campaignQr = true); return }
         performEntryChange(false, code)
     }
     fun nextScannedTicket() {
         if (!mutable.value.scannerOpen || mutable.value.checkingIn || mutable.value.unknownCode != null) return
         frameGate.resume()
-        mutable.value = mutable.value.copy(scannerEpoch = ++scannerEpoch, checkInResult = null, checkInError = false, verifiedAfterUnknown = false)
+        mutable.value = mutable.value.copy(scannerEpoch = ++scannerEpoch, checkInResult = null, checkInError = false, verifiedAfterUnknown = false, campaignQr = false)
     }
     fun query(value: String) {
         if (mutable.value.checkingIn) return

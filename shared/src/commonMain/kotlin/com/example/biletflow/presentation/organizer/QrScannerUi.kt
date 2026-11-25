@@ -57,7 +57,7 @@ fun QrScannerPage(vm: CheckInOverviewViewModel) {
         vm.scannerForeground(true)
         onPauseOrDispose { vm.scannerForeground(false) }
     }
-    val paused = state.checkingIn || state.checkInResult != null || state.checkInError || state.unknownCode != null || state.verifiedAfterUnknown
+    val paused = state.checkingIn || state.checkInResult != null || state.checkInError || state.unknownCode != null || state.verifiedAfterUnknown || state.campaignQr
     Column(Modifier.fillMaxSize().statusBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = vm::closeScanner) { Text(stringResource(Res.string.ticket_create_back)) }
         Text(state.event?.title.orEmpty(), style = MaterialTheme.typography.titleLarge)
@@ -76,6 +76,10 @@ fun QrScannerPage(vm: CheckInOverviewViewModel) {
                             color = if (result.result == "checked_in") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
                         Text(stringResource(checkInResultLabel(result.result)), style = MaterialTheme.typography.titleLarge)
                         result.ticket?.let { Text("${it.attendeeName.orEmpty()} · ${it.ticketTypeName.orEmpty()} · #${it.id}") }
+                    }
+                    if (state.campaignQr) {
+                        Text("!", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(Res.string.scan_campaign_qr), style = MaterialTheme.typography.titleLarge)
                     }
                     if (state.checkInError) Text(stringResource(Res.string.check_action_error))
                     if (state.unknownCode != null) {

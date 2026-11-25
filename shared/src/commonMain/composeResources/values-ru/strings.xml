@@ -600,4 +600,10 @@
     <string name="pdf_share_failed">Нет приложения, чтобы открыть или отправить файл.</string>
     <string name="pdf_network">Ошибка сети. Файл не скачан.</string>
     <string name="pdf_failed">Не удалось скачать файл</string>
+    <string name="scan_campaign_qr">Рекламный QR, не входной билет</string>
+    <string name="campaigns_qr_title">Campaign QR</string>
+    <string name="campaigns_qr_help">Для афиш и флаеров. Открывает страницу мероприятия и не является входным билетом.</string>
+    <string name="campaigns_qr_share">Поделиться QR (PNG)</string>
+    <string name="campaign_link_invalid">Ссылка недействительна.</string>
+    <string name="campaign_link_failed">Не удалось открыть ссылку. Проверьте соединение.</string>
 </resources>

@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
             val network = config.getOrThrow()
             App(useMockEvents = network.environment == com.example.biletflow.core.network.ApiEnvironment.MOCK, sessionStorage = androidx.compose.runtime.remember {
                 AndroidSessionStorage(applicationContext, network.sessionNamespace)
-            }, registerBack = { action ->
+            }, initialLink = intent?.dataString, registerBack = { action ->
                 backAction = action
                 backCallback.isEnabled = action != null
             })

@@ -305,6 +305,11 @@ private fun CampaignDetail(vm: CampaignsViewModel,state: CampaignsState,modifier
         Text(stringResource(Res.string.campaigns_stats),style=MaterialTheme.typography.titleMedium)
         Text("${stringResource(Res.string.campaigns_stat_orders)}: ${item.stats.orders} · ${stringResource(Res.string.campaigns_stat_tickets)}: ${item.stats.tickets}")
         Text("${stringResource(Res.string.campaigns_stat_gross)}: ${item.stats.gross} ₸ · ${stringResource(Res.string.campaigns_stat_discount)}: ${item.stats.discount} ₸ · ${stringResource(Res.string.campaigns_stat_net)}: ${item.stats.net} ₸")
+        Text(stringResource(Res.string.campaigns_qr_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(Res.string.campaigns_qr_help))
+        com.example.biletflow.presentation.documents.RemotePngImage("/campaigns/${item.id}/qr", stringResource(Res.string.campaigns_qr_title), Modifier.size(220.dp))
+        com.example.biletflow.presentation.documents.DocumentButton(stringResource(Res.string.campaigns_qr_share), "/campaigns/${item.id}/qr",
+            "campaign-${item.code}.png", "image/png")
         Text(stringResource(Res.string.campaigns_fixed_help))
         state.editError?.let { Text(stringResource(Res.string.campaigns_error),color=MaterialTheme.colorScheme.error); Text(it) }
         if(state.editUnknown) { Text(stringResource(Res.string.campaigns_edit_unknown)); TextButton(onClick=vm::checkEdit) { Text(stringResource(Res.string.campaigns_check_state)) } }

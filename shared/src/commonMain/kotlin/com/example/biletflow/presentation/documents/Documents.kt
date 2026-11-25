@@ -20,6 +20,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.decodeToImageBitmap
 import org.jetbrains.compose.resources.stringResource
 
 /** Authorized binary downloads (ticket/order PDF, Campaign QR PNG) shared through the platform file sharer. */
@@ -66,5 +67,29 @@ fun DocumentButton(label: String, path: String, fileName: String, mimeType: Stri
                 else -> "${stringResource(Res.string.pdf_failed)} ($code)"
             }, color = MaterialTheme.colorScheme.error)
         }
+    }
+}
+
+/** Loads an authorized PNG (e.g. Campaign QR) once per path and shows it; errors are shown inline. */
+@Composable
+fun RemotePngImage(path: String, description: String, modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier) {
+    val documents = LocalDocuments.current ?: return
+    var image by remember(path) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var failed by remember(path) { mutableStateOf<String?>(null) }
+    LaunchedEffect(path) {
+        val generation = documents.session.generation
+        try {
+            val bytes = documents.fetch(path, "image/png")
+            if (generation == documents.session.generation) image = runCatching { bytes.decodeToImageBitmap() }.getOrElse { failed = "png"; null }
+        } catch (failure: Exception) {
+            if (failure is CancellationException) throw failure
+            if (generation == documents.session.generation) failed = (failure as? OrdersApiException)?.let { it.errorCode ?: "HTTP ${it.statusCode}" } ?: "network"
+        }
+    }
+    val bitmap = image
+    when {
+        bitmap != null -> androidx.compose.foundation.Image(bitmap, description, modifier)
+        failed != null -> Text("${stringResource(Res.string.pdf_failed)} ($failed)", color = MaterialTheme.colorScheme.error)
+        else -> CircularProgressIndicator()
     }
 }

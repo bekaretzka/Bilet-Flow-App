@@ -115,3 +115,26 @@ fun campaignPatch(original:Campaign,values:Map<String,String>):Pair<JsonObject,S
 fun findCreatedCampaign(after:List<Campaign>,beforeIds:Set<Int>,input:CampaignCreate):Campaign? =
     if(input.code!=null) after.firstOrNull {it.code.equals(input.code,ignoreCase=true)}
     else after.filter {it.id !in beforeIds && it.name==input.name && it.discountType==input.discountType && it.discountValue==input.discountValue}.singleOrNull()
+
+@Serializable
+data class CampaignLink(@SerialName("event_id") val eventId: Int, @SerialName("promo_code") val promoCode: String? = null,
+    @SerialName("discount_type") val discountType: String? = null, @SerialName("discount_value") val discountValue: Long? = null)
+
+/** The opaque token of a Campaign QR link (`...?campaign=C-...`), or null when the text is not such a URL. */
+fun campaignTokenFromLink(text: String): String? {
+    val trimmed = text.trim()
+    if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) return null
+    val url = runCatching { Url(trimmed) }.getOrNull() ?: return null
+    if (url.host.isEmpty()) return null
+    return url.parameters["campaign"]?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+/** Public GET /campaign-links/{token}. It counts an open, so call it once per transition. */
+suspend fun resolveCampaignLink(client: HttpClient, baseUrl: String, token: String): CampaignLink {
+    val response = client.get("$baseUrl/campaign-links/${token.encodeURLPathPart()}")
+    if (response.status.value != 200) {
+        val body = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+        throw CampaignApiException(response.status.value, (body?.get("error") as? JsonPrimitive)?.contentOrNull, emptySet(), "HTTP ${response.status.value}")
+    }
+    return response.body()
+}

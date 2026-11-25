@@ -600,4 +600,10 @@
     <string name="pdf_share_failed">No app could open or share the file.</string>
     <string name="pdf_network">Network error. The file was not downloaded.</string>
     <string name="pdf_failed">Unable to download the file</string>
+    <string name="scan_campaign_qr">Promotional QR, not an entry ticket</string>
+    <string name="campaigns_qr_title">Campaign QR</string>
+    <string name="campaigns_qr_help">For posters and flyers. It opens the event page and is never an entry ticket.</string>
+    <string name="campaigns_qr_share">Share QR (PNG)</string>
+    <string name="campaign_link_invalid">This link is invalid.</string>
+    <string name="campaign_link_failed">Unable to open the link. Check the connection.</string>
 </resources>
