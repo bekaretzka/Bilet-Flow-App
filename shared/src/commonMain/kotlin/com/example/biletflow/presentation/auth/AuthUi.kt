@@ -57,6 +57,7 @@ fun LoginPage(
     onClose: () -> Unit,
     onLoginSuccess: () -> Unit,
     onOpenRegistration: (() -> Unit)? = null,
+    onResetLink: (() -> Unit)? = null,
 ) {
     val page by viewModel.page.collectAsState()
     if (page == AuthPage.Registration) {
@@ -98,6 +99,9 @@ fun LoginPage(
             forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = Color(0xFFB3261E), fontSize = 12.sp)
             forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = Color(0xFFB3261E), fontSize = 12.sp)
             forgot.message != null -> Text(forgot.message?.ifBlank { null } ?: stringResource(Res.string.auth_forgot_sent), fontSize = 12.sp)
+        }
+        if (forgot.message != null && onResetLink != null) TextButton(onClick = onResetLink, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
+            Text(stringResource(Res.string.reset_password_have_link), color = Purple, fontSize = 12.sp)
         }
         AuthFeedback(state)
         Spacer(Modifier.height(10.dp))

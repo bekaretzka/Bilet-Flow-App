@@ -94,6 +94,13 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             com.example.biletflow.presentation.auth.CurrentUserViewModel(apiClient,ordersRepository,sessionStore)
         }
         val currentUserState by currentUserVm.state.collectAsState()
+        val changePasswordVm: com.example.biletflow.presentation.auth.ChangePasswordViewModel = viewModel {
+            com.example.biletflow.presentation.auth.ChangePasswordViewModel(apiClient, ordersRepository, sessionStore)
+        }
+        val accountLinkVm: com.example.biletflow.presentation.auth.AccountLinkViewModel = viewModel {
+            com.example.biletflow.presentation.auth.AccountLinkViewModel(apiClient, sessionStore, onVerified = currentUserVm::refreshAfterChange)
+        }
+        val accountLinkState by accountLinkVm.state.collectAsState()
         val currentUser by sessionStore.user.collectAsState()
         val suspended by sessionStore.suspended.collectAsState()
         val supportVm: SupportViewModel = viewModel { SupportViewModel(apiClient, ordersRepository, sessionStore) }
@@ -273,6 +280,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             com.example.biletflow.core.links.IncomingLinks.pending.collect { pending ->
                 if (pending == null) return@collect
                 val link = com.example.biletflow.core.links.IncomingLinks.take() ?: return@collect
+                com.example.biletflow.presentation.auth.parseAccountLink(link, webHost)?.let { accountLinkVm.open(it.kind, it.token); return@collect }
                 val parsed = com.example.biletflow.core.links.parseEventLink(link, webHost) ?: return@collect
                 val openEvent = { eventId: Int, promoCode: String? ->
                     orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
@@ -299,8 +307,9 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         if(suspended) AlertDialog(onDismissRequest=sessionStore::dismissSuspended,
             text={ Text(stringResource(Res.string.session_suspended)) },
             confirmButton={ TextButton(onClick=sessionStore::dismissSuspended) { Text("OK") } })
-        val isRoot = !adminState.open && campaignsState.eventId == null && !supportHistoryState.open && !supportState.open && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
+        val isRoot = !accountLinkState.open && !adminState.open && campaignsState.eventId == null && !supportHistoryState.open && !supportState.open && !staffEventsState.open && !myEventsState.open && !organizerState.form && !showLogin && selectedTicketId == null && completedOrder == null && selectedEventId == null
         val backAction: (() -> Unit)? = when {
+            accountLinkState.open -> ({ accountLinkVm.close() })
             campaignsState.eventId != null && !showLogin -> ({ campaignsVm.back() })
             supportHistoryState.open && !showLogin -> ({ supportHistoryVm.back() })
             supportState.open && !showLogin -> ({ if (!supportState.sending) supportVm.close() })
@@ -366,11 +375,15 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         if(session != null && currentUser?.emailVerified == false && !showLogin) Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp)) {
             Text(stringResource(Res.string.email_unverified_banner))
             TextButton(onClick=currentUserVm::resendVerification, enabled=!currentUserState.resending) { Text(stringResource(Res.string.email_resend)) }
+            TextButton(onClick={ accountLinkVm.open(com.example.biletflow.presentation.auth.AccountLinkKind.VerifyEmail) }) { Text(stringResource(Res.string.verify_email_have_link)) }
             if(currentUserState.resendSent) Text(stringResource(Res.string.email_resend_sent))
             currentUserState.resendError?.let { Text("${stringResource(Res.string.email_resend_failed)} ($it)") }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
+            accountLinkState.open -> com.example.biletflow.presentation.auth.AccountLinkPage(accountLinkVm) {
+                authViewModel.closeLoginFlow(); loginForHistory = false; showLogin = true
+            }
             campaignsState.eventId != null && !showLogin -> CampaignsPage(campaignsVm)
             supportHistoryState.open && !showLogin -> SupportCasesPage(supportHistoryVm, session != null, eventsRepository) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
@@ -402,6 +415,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             organizerState.form && !showLogin -> OrganizerApplicationPage(organizerVm) { showLogin = true }
             showLogin -> LoginPage(
                 viewModel = authViewModel,
+                onResetLink = { accountLinkVm.open(com.example.biletflow.presentation.auth.AccountLinkKind.ResetPassword) },
                 onClose = {
                     authViewModel.closeLoginFlow()
                     showLogin = false
@@ -501,6 +515,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                         }
                         TextButton(onClick=currentUserVm::load) { Text(stringResource(Res.string.organizer_refresh)) }
                     }
+                    com.example.biletflow.presentation.auth.ChangePasswordSection(changePasswordVm)
                 }
                 if (session != null && currentUser?.canScan == true) Button(onClick = staffEventsVm::open) { Text(stringResource(Res.string.staff_events_title)) }
                 if (session != null && currentUser?.organizer?.status == "approved") {
