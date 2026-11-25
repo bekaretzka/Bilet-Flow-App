@@ -22,7 +22,7 @@ import kotlin.test.*
 class StaffEventsTest {
     @Test fun assignedAndOwnedEventsRevocationRetryAndRefresh() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val auth = AuthRepositoryImpl(client, "http://test")
         val session = SessionStore().apply { save(AuthTokens("mock-access-token", "mock-refresh-token", "bearer")) }
         val requests = SessionOrdersRepository(OrdersRepositoryImpl(client, "http://test"), auth, session, backgroundScope)

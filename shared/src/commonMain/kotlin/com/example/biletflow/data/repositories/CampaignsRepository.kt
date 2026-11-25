@@ -11,47 +11,40 @@ import kotlinx.serialization.json.*
 
 @Serializable
 data class CampaignCreate(
-    val name: String, val code: String,
+    val name: String, val code: String? = null,
     @SerialName("discount_type") val discountType: String,
     @SerialName("discount_value") val discountValue: Long,
-    @SerialName("starts_at") val startsAt: String,
-    @SerialName("ends_at") val endsAt: String,
-    @SerialName("usage_limit") val usageLimit: Int? = null,
+    @SerialName("starts_at") val startsAt: String? = null,
+    @SerialName("ends_at") val endsAt: String? = null,
+    @SerialName("max_redemptions") val maxRedemptions: Long? = null,
     @SerialName("ticket_type_ids") val ticketTypeIds: List<Int> = emptyList(),
-    @SerialName("client_request_id") val clientRequestId: String,
 )
 @Serializable
 data class Campaign(
-    val id: Int, @SerialName("event_id") val eventId: Int,
-    val name: String, val code: String,
-    @SerialName("discount_type") val discountType: String,
-    @SerialName("discount_value") val discountValue: Long,
-    @SerialName("starts_at") val startsAt: String,
-    @SerialName("ends_at") val endsAt: String,
-    @SerialName("usage_limit") val usageLimit: Int?,
-    @SerialName("ticket_type_ids") val ticketTypeIds: List<Int>,
-    @SerialName("client_request_id") val clientRequestId: String,
-    @SerialName("created_at") val createdAt: String,
+    val id:Int,@SerialName("event_id") val eventId:Int,val name:String,val code:String,
+    @SerialName("discount_type") val discountType:String,@SerialName("discount_value") val discountValue:Long,
+    @SerialName("starts_at") val startsAt:String?,@SerialName("ends_at") val endsAt:String?,
+    @SerialName("max_redemptions") val maxRedemptions:Long?,
+    @SerialName("redemptions_count") val redemptionsCount:Long,@SerialName("is_active") val isActive:Boolean,
+    val link:String,@SerialName("link_opens") val linkOpens:Long,
+    @SerialName("ticket_type_ids") val ticketTypeIds:List<Int>,@SerialName("created_at") val createdAt:String,val stats:CampaignStats,
 )
 @Serializable
-data class CampaignPage(val items: List<Campaign>, @SerialName("next_cursor") val nextCursor: String?)
+data class CampaignStats(val orders:Long,val tickets:Long,val gross:Long,val discount:Long,val net:Long)
 class CampaignApiException(val status: Int, val code: String?, val fields: Set<String>, override val message: String): Exception(message)
 
-fun validateCampaign(input: CampaignCreate): Set<String> = buildSet {
-    val length = input.name.indices.count { it == 0 || !input.name[it].isLowSurrogate() || !input.name[it-1].isHighSurrogate() }
-    if(input.name != input.name.trim() || length !in 1..200) add("name")
-    if(!Regex("[A-Z0-9][A-Z0-9_-]{2,31}").matches(input.code)) add("code")
+fun validateCampaign(input:CampaignCreate):Set<String> = buildSet {
+    if(com.example.biletflow.presentation.support.supportTextLength(input.name) !in 1..200) add("name")
+    if(input.code!=null && !Regex("[A-Za-z0-9-]{3,32}").matches(input.code)) add("code")
     if(input.discountType !in listOf("percent","fixed")) add("discount_type")
-    if(input.discountValue !in 1L..(if(input.discountType == "percent") 100L else 1_000_000_000L)) add("discount_value")
-    val start=runCatching { Instant.parse(input.startsAt) }.getOrNull()
-    val end=runCatching { Instant.parse(input.endsAt) }.getOrNull()
-    if(start == null) add("starts_at")
-    if(end == null || start != null && end <= start) add("ends_at")
-    if(input.usageLimit != null && input.usageLimit !in 1..1_000_000) add("usage_limit")
-    if(input.ticketTypeIds.size > 100 || input.ticketTypeIds.any { it <= 0 } || input.ticketTypeIds.distinct().size != input.ticketTypeIds.size) add("ticket_type_ids")
-    if(!Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}").matches(input.clientRequestId)) add("client_request_id")
+    if(input.discountValue<1 || input.discountType=="percent" && input.discountValue>100) add("discount_value")
+    val start=input.startsAt?.let {runCatching {Instant.parse(it)}.getOrNull()}
+    val end=input.endsAt?.let {runCatching {Instant.parse(it)}.getOrNull()}
+    if(input.startsAt!=null && start==null) add("starts_at")
+    if(input.endsAt!=null && end==null || start!=null && end!=null && end<=start) add("ends_at")
+    if(input.maxRedemptions!=null && input.maxRedemptions<1) add("max_redemptions")
+    if(input.ticketTypeIds.size>100) add("ticket_type_ids")
 }
-
 class CampaignsRepository(private val client: HttpClient,private val requests: SessionOrdersRepository,private val baseUrl: String) {
     private suspend fun io.ktor.client.statement.HttpResponse.check(expected: Int) {
         if(status.value == expected) return
@@ -63,18 +56,16 @@ class CampaignsRepository(private val client: HttpClient,private val requests: S
             .mapNotNull { (it as? JsonObject)?.get("loc")?.jsonArray?.lastOrNull()?.jsonPrimitive?.contentOrNull }
         throw CampaignApiException(status.value,code,fields,message)
     }
-    suspend fun list(eventId: Int,cursor: String? = null,limit: Int = 50): CampaignPage = requests.request { token ->
-        val response=client.get("$baseUrl/organizer/events/$eventId/campaigns") {
-            bearerAuth(token); parameter("limit",limit); cursor?.let { parameter("cursor",it) }
-        }
+    suspend fun list(eventId:Int):List<Campaign> = requests.request {token ->
+        val response=client.get("$baseUrl/events/$eventId/campaigns") {bearerAuth(token)}
         response.check(200)
-        response.body<CampaignPage>().also { require(it.items.all { campaign -> campaign.eventId == eventId }) }
+        response.body<List<Campaign>>().also {require(it.all {campaign -> campaign.eventId==eventId})}
     }
     suspend fun create(eventId: Int,input: CampaignCreate): Campaign = requests.request { token ->
-        val response=client.post("$baseUrl/organizer/events/$eventId/campaigns") {
+        val response=client.post("$baseUrl/events/$eventId/campaigns") {
             bearerAuth(token); contentType(ContentType.Application.Json); setBody(input)
         }
         response.check(201)
-        response.body<Campaign>().also { require(it.eventId == eventId && it.clientRequestId == input.clientRequestId) }
+        response.body<Campaign>().also { require(it.eventId == eventId) }
     }
 }

@@ -22,7 +22,7 @@ import kotlin.test.*
 class CheckInOverviewTest {
     @Test fun staffStatsSearchEncodingRefreshAndRevocation() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val searches = mutableListOf<String>()
         var checkInPosts = 0
         client.plugin(HttpSend).intercept { request ->
@@ -42,6 +42,7 @@ class CheckInOverviewTest {
             repeat(3) { organizer.load(); organizer.state.first { !it.loading } }
             staff.open(101, "Test"); staff.state.first { !it.loading }; staff.reload(); staff.state.first { !it.loading }
             staff.email("empty@biletflow.kz"); staff.add(); staff.state.first { !it.busy && !it.loading }
+            prepareTicketFixture(client)
             val order = orders.createOrder(101, "A+B & Тест", listOf(CreateOrderItem(1002, 2)), "mock-access-token")
             val event = EventsRepositoryImpl(client, "http://test").getEvent(101)
             session.save(auth.login("empty@biletflow.kz", "password123")); runCurrent()

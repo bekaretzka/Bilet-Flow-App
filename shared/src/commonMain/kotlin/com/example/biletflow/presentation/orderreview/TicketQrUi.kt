@@ -19,6 +19,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.biletflow.presentation.events.EventContextCaption
+import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,6 +45,7 @@ fun TicketQrPage(
     typeName: String?,
     viewModel: TicketQrViewModel,
     onBack: () -> Unit,
+    eventsRepository: EventsRepository? = null,
     onLogin: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
@@ -60,6 +63,7 @@ fun TicketQrPage(
             Text("BiletFlow", color = Color(0xFF17171B), fontSize = 21.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(20.dp))
+        EventContextCaption(ticket.eventId,eventsRepository)
         Text(stringResource(Res.string.ticket_qr_title), fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text(

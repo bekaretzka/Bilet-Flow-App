@@ -29,7 +29,7 @@ class OrganizerTicketTypesTest {
             override suspend fun write(value: String) { record = value }
             override suspend fun clear() { record = null }
         }
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         try {
             val auth = AuthRepositoryImpl(client,"http://test")
             auth.register("suspend-on-manage@biletflow.kz","password123")
@@ -47,7 +47,7 @@ class OrganizerTicketTypesTest {
 
     @Test fun fullManageListFreshViewModelMutationsRecoveryAndAccess() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var lose: String? = null
         val writes = mutableMapOf<String, Int>()
         val managePaths = mutableListOf<String>()

@@ -12,6 +12,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import kotlinx.coroutines.flow.first
 import androidx.lifecycle.viewModelScope
+import io.ktor.client.request.*
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -110,6 +111,7 @@ class OrganizerTest {
             tickets.load(draft.id); tickets.state.first { !it.listLoading }
             assertEquals(1,tickets.list(draft.id).count { it.id == issued.id })
             assertEquals(0,publicEvents.getTicketTypes(draft.id).first { it.id == issued.id }.price)
+            assertEquals(200,client.patch("http://test/events/101/publish") {bearerAuth("mock-access-token")}.status.value)
             val sold = publicEvents.getTicketTypes(101).first { it.soldCount > 0 }
             tickets.edit(sold); tickets.update("quantity","1")
             tickets.save(); tickets.state.first { !it.saving }
@@ -161,6 +163,8 @@ class OrganizerTest {
             tickets.close()
             create.reset()
             assertTrue(events.state.value.events.all { it.organizerId == vm.state.value.profile?.id })
+            assertEquals(200,client.patch("http://test/events/101/unpublish") {bearerAuth("mock-access-token")}.status.value)
+            events.reload();events.state.first {!it.loading}
             events.filter("draft")
             assertEquals(1, events.state.value.events.count { it.status == events.state.value.filter })
             events.close()

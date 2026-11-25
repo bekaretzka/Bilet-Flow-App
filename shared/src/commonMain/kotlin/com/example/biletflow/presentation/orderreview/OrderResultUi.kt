@@ -21,6 +21,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.biletflow.presentation.events.EventContextCaption
+import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +52,7 @@ fun OrderResultPage(
     order: Order,
     viewModel: OrderPaymentViewModel,
     onOrderUpdated: (Order) -> Unit,
+    eventsRepository: EventsRepository? = null,
     onLogin: () -> Unit,
     ticketTypeNames: Map<Int, String>,
     onOpenTicket: (Int) -> Unit,
@@ -91,6 +94,7 @@ fun OrderResultPage(
         modifier = Modifier.fillMaxSize().background(PageBackground).statusBarsPadding().padding(24.dp),
     ) {
         Spacer(Modifier.height(28.dp))
+        EventContextCaption(order.eventId,eventsRepository)
         Text(stringResource(Res.string.order_result_title), color = Ink, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(24.dp))
         Column(

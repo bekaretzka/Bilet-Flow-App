@@ -30,7 +30,7 @@ class CurrentUserTest {
 
     @Test fun loadsAfterLoginAndRestorationAndPreservesGenerationOnRotation() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         val storage=Storage()
         val store=SessionStore(storage,this)
         val vm=CurrentUserViewModel(client,requests(client,store,backgroundScope),store,"http://test")
@@ -58,7 +58,7 @@ class CurrentUserTest {
 
     @Test fun networkFailureKeepsTokensAndCanRetry() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         val auth=AuthRepositoryImpl(client,"http://test")
         auth.register("me-offline@biletflow.kz","password123")
         val store=SessionStore().also { it.save(auth.login("me-offline@biletflow.kz","password123")) }
@@ -76,7 +76,7 @@ class CurrentUserTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         try {
             for(email in listOf("suspend-on-me@biletflow.kz","suspend-on-orders@biletflow.kz")) {
-                val client=createMockEventsHttpClient()
+                val client=createMockEventsHttpClient(publishedFixtureEvents = true)
                 val storage=Storage()
                 val store=SessionStore(storage,this)
                 val auth=AuthRepositoryImpl(client,"http://test")
@@ -101,7 +101,7 @@ class CurrentUserTest {
 
     @Test fun lateSuspensionCannotClearNewAccountAndOtherForbiddenDoesNotLogOut() = runTest {
         val store=SessionStore().also { it.save(AuthTokens("old","r","bearer")) }
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         try {
             val repo=requests(client,store,backgroundScope)
             val started=CompletableDeferred<Unit>(); val release=CompletableDeferred<Unit>()
@@ -140,7 +140,7 @@ class CurrentUserTest {
 
     @Test fun mockApplicationRefreshesProfileAndStaffDoesNotRequireOrganizerRole() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         val auth=AuthRepositoryImpl(client,"http://test")
         val store=SessionStore().also { it.save(auth.login("visitor@biletflow.kz","password123")) }
         val repo=requests(client,store,backgroundScope)

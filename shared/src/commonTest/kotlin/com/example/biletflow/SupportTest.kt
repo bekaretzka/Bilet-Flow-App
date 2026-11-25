@@ -20,7 +20,7 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class SupportTest {
     @Test fun suspensionFromCasesEndsCurrentSession()=runTest {
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         try {
             val auth=AuthRepositoryImpl(client,"http://test")
             auth.register("suspend-on-cases@biletflow.kz","password123")
@@ -32,7 +32,7 @@ class SupportTest {
     }
     private fun session()=SessionStore().apply {save(AuthTokens("mock-access-token","mock-refresh-token","bearer"))}
     @Test fun currentCaseContractSingleContextCategoriesOwnershipAndRefresh()=runTest {
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         val bodies=mutableListOf<JsonObject>()
         client.plugin(HttpSend).intercept {request ->
             if(request.url.build().encodedPath=="/support/cases") bodies.add(Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject)
@@ -63,7 +63,7 @@ class SupportTest {
     }
     @Test fun unknownCreationPreservesTextBlocksDoubleClickAndOffersListWithoutAnotherPost()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val gate=CompletableDeferred<Unit>();var posts=0
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val gate=CompletableDeferred<Unit>();var posts=0
         client.plugin(HttpSend).intercept {request ->
             if(request.url.build().encodedPath=="/support/cases") {posts++;gate.await()}
             execute(request)
@@ -85,7 +85,7 @@ class SupportTest {
     }
     @Test fun formSendsOnlyMostSpecificContextEvenWhenEventIsKnown()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val bodies=mutableListOf<JsonObject>()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val bodies=mutableListOf<JsonObject>()
         client.plugin(HttpSend).intercept {request ->
             if(request.url.build().encodedPath=="/support/cases" && request.method==HttpMethod.Post) bodies.add(Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject)
             execute(request)
@@ -106,7 +106,7 @@ class SupportTest {
     }
     @Test fun guestLoginPreservesFormAndAccountChangeIgnoresLateResponse()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val gate=CompletableDeferred<Unit>();var hold=false
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val gate=CompletableDeferred<Unit>();var hold=false
         client.plugin(HttpSend).intercept {request ->
             val response=execute(request)
             if(hold && request.url.build().encodedPath=="/support/cases") withContext(NonCancellable) {gate.await()}
@@ -126,7 +126,7 @@ class SupportTest {
     }
     @Test fun arrayListsInboxFiltersExactCasePreviewAndRequesterIsolation()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val store=session();val auth=AuthRepositoryImpl(client,"http://test")
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val store=session();val auth=AuthRepositoryImpl(client,"http://test")
         val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)
         val repo=SupportCasesRepository(client,requests,"http://test")
         val organizer=OrganizerViewModel(client,requests,store,"http://test");val vm=SupportCasesViewModel(client,requests,store,"http://test")
@@ -148,7 +148,7 @@ class SupportTest {
     }
     @Test fun listRetryAndLateListAfterLogoutCannotRestoreData()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val auth=AuthRepositoryImpl(client,"http://test")
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val auth=AuthRepositoryImpl(client,"http://test")
         auth.register("cases-offline@biletflow.kz","password123")
         val store=SessionStore().apply {save(auth.login("cases-offline@biletflow.kz","password123"))}
         val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)

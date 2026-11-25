@@ -79,7 +79,7 @@ class OrganizerOrdersTest {
             override suspend fun write(value:String) { record=value }
             override suspend fun clear() { record=null }
         }
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         try {
             val auth=AuthRepositoryImpl(client,"http://test")
             auth.register("suspend-on-event-orders@biletflow.kz","password123")
@@ -93,7 +93,7 @@ class OrganizerOrdersTest {
 
     @Test fun paginationRefundValidationDoubleSubmitAndDownstreamUpdates() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var failList = false
         var hold: CompletableDeferred<Unit>? = null
         var posts = 0
@@ -182,7 +182,7 @@ class OrganizerOrdersTest {
 
     @Test fun lostRefundResponseIsVerifiedThroughOrganizerGetWithoutSecondPostAndConflictRefreshes() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var posts = 0
         var failGet = false
         client.plugin(HttpSend).intercept { request ->
@@ -211,7 +211,7 @@ class OrganizerOrdersTest {
             vm.askRefund(); vm.confirmRefund(); runCurrent(); assertEquals(1,posts)
             vm.checkOrder(); settled()
             assertEquals("refunded",vm.state.value.order!!.status); assertTrue(vm.state.value.unknown.isEmpty()); assertEquals(1,posts)
-            vm.back(); vm.reload(); settled(); assertEquals("refunded",vm.state.value.orders.single().status)
+            vm.back(); vm.reload(); settled(); assertEquals("refunded",vm.state.value.orders.first {it.id==7103}.status)
 
             orders.payOrder(7101,"mock-access-token")
             vm.open(101,"First"); settled(); vm.select(7101); settled(); vm.askRefund(); vm.reason("Concurrent change")

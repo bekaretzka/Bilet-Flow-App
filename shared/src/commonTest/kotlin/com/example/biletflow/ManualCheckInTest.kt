@@ -23,7 +23,7 @@ import kotlin.test.*
 class ManualCheckInTest {
     @Test fun statefulEntryRepeatUnknownAndBuyerTicket() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var posts = 0
         client.plugin(HttpSend).intercept { request ->
             if (request.method == HttpMethod.Post && request.url.build().encodedPath.endsWith("/check-in")) posts++

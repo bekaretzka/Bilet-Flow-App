@@ -86,7 +86,7 @@ class EventDetailsTest {
     }
 
     private fun mockRepository() = EventsRepositoryImpl(
-        client = createMockEventsHttpClient(),
+        client = createMockEventsHttpClient(publishedFixtureEvents = true),
         baseUrl = "http://mock.biletflow",
     )
 

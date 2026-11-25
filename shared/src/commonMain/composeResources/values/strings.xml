@@ -472,23 +472,23 @@
     <string name="campaigns_empty">No campaigns yet</string>
     <string name="campaigns_error">Unable to load or save the campaign. Your form is preserved.</string>
     <string name="campaigns_name">Name</string>
-    <string name="campaigns_code">Promo code</string>
+    <string name="campaigns_code">Promo code (blank = generated)</string>
     <string name="campaigns_value">Discount: integer % or KZT</string>
-    <string name="campaigns_start">Starts at (ISO 8601 with offset)</string>
-    <string name="campaigns_end">Ends at (ISO 8601 with offset)</string>
-    <string name="campaigns_limit">Usage limit (blank = unlimited)</string>
+    <string name="campaigns_start">Starts at (optional)</string>
+    <string name="campaigns_end">Ends at (optional)</string>
+    <string name="campaigns_limit">Max redemptions</string>
     <string name="campaigns_percent">Percent</string>
     <string name="campaigns_fixed">Fixed ₸</string>
     <string name="campaigns_save">Save campaign</string>
-    <string name="campaigns_dates_help">Enter the time zone explicitly, for example 2027-01-01T10:00:00+05:00. End must be later than start.</string>
-    <string name="campaigns_types_help">Applicable ticket types: no selection means all current and future types. The list includes hidden types.</string>
+    <string name="campaigns_dates_help">Dates are optional. If entered, use ISO 8601 with a UTC offset; end must follow start.</string>
+    <string name="campaigns_types_help">Select paid types only. No selection means all paid types of this event, including future ones.</string>
     <string name="campaigns_name_error">Enter 1–200 characters.</string>
-    <string name="campaigns_code_error">Code must be unique: 3–32 Latin letters, digits, _ or -, starting with a letter or digit. It is converted to uppercase.</string>
-    <string name="campaigns_value_error">Enter an integer: 1–100 percent or 1–1,000,000,000 KZT.</string>
-    <string name="campaigns_limit_error">Leave blank or enter an integer from 1 to 1,000,000.</string>
+    <string name="campaigns_code_error">Use 3–32 Latin letters, digits or hyphens. Underscore is forbidden. Unique within this event; blank generates a code.</string>
+    <string name="campaigns_value_error">Enter a positive whole number; percent must be 1–100.</string>
+    <string name="campaigns_limit_error">Leave blank for unlimited, or enter a positive integer.</string>
     <string name="campaigns_date_error">Use ISO 8601 with a time zone. End must be later than start.</string>
     <string name="campaigns_types_error">Select at most 100 ticket types belonging to this event.</string>
-    <string name="campaigns_unknown">Server confirmation was not received. Retry without editing to reuse the same request ID and body. Editing creates a new submission; the previous campaign may already exist.</string>
+    <string name="campaigns_unknown">Creation may have completed. Check the list before any new submission. A matching name does not prove creation; no automatic retry is made.</string>
     <string name="catalog_more">Load more</string>
     <string name="catalog_categories_retry">Retry categories</string>
     <string name="current_user_error">Unable to load your profile. Your session is kept; you can retry or browse events.</string>
@@ -524,4 +524,11 @@
     <string name="support_case_failed">The server rejected the request.</string>
     <string name="support_message_result_unknown">The result is unknown: the message may or may not have been delivered. It was not found in the conversation, so your text is kept. Check the conversation (Refresh) before sending again.</string>
     <string name="support_status_unknown">No server confirmation was received. The status shown is the one the server reports now; no automatic retry was made.</string>
+    <string name="event_context_unavailable">Event #%1$d unavailable</string>
+    <string name="event_context_number">Event #%1$d</string>
+    <string name="campaigns_redemptions">Redemptions</string>
+    <string name="campaigns_unlimited">Unlimited</string>
+    <string name="campaigns_no_end">No end date</string>
+    <string name="campaigns_no_start">No start date</string>
+    <string name="campaigns_check_list">Check campaign list</string>
 </resources>

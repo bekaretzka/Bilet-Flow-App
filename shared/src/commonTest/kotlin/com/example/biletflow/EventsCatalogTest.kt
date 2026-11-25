@@ -20,22 +20,22 @@ class EventsCatalogTest {
         try {
             val first=repo.getEventsPage(limit=20)
             val second=repo.getEventsPage(limit=20,offset=20)
-            assertEquals(29,first.total); assertEquals(20,first.items.size); assertEquals(9,second.items.size)
-            assertEquals(29,(first.items+second.items).map { it.id }.distinct().size)
+            assertEquals(27,first.total); assertEquals(20,first.items.size); assertEquals(7,second.items.size)
+            assertEquals(27,(first.items+second.items).map { it.id }.distinct().size)
             val found=repo.getEventsPage(q="  ДАЛЬНИЙ  ",category="Театр")
             assertEquals(1,found.total); assertEquals(10025,found.items.single().id)
             assertTrue(repo.getCategories().contains("Театр"))
             assertEquals(0,repo.getEventsPage(q="no-matches").total)
             assertEquals(0,repo.getEventsPage(q="Дальний",category="Концерт").total)
             assertTrue(repo.getEventsPage(q="Сауран").total > 0) // Address is searched by the server.
-            val old=EventsRepositoryImpl(createMockEventsHttpClient(),"http://test").getEvents()
-            assertEquals(4,old.size); assertNull(old.last().category); assertNull(old.last().venueName)
+            val old=EventsRepositoryImpl(createMockEventsHttpClient(publishedFixtureEvents = true),"http://test").getEvents()
+            assertEquals(3,old.size); assertNull(old.last().category); assertNull(old.last().venueName)
             assertEquals("05.12.2026 · 19:00 (UTC+05:00)",formatEventDate(old.first().startTime))
         } finally { client.close() }
     }
     @Test fun firstAndNextPageErrorsRetryTheSameOffsetAndPreserveCards() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         var firstFailure=true; var nextFailure=true
         val offsets=mutableListOf<String?>()
         client.plugin(HttpSend).intercept { request ->
@@ -52,7 +52,7 @@ class EventsCatalogTest {
             vm.reload(); vm.state.first { !it.isLoading }; assertEquals(2,vm.state.value.events.size,vm.state.value.error)
             vm.loadMore(); vm.state.first { !it.loadingMore }; assertNotNull(vm.state.value.pageError)
             assertEquals(2,vm.state.value.events.size); assertEquals(2,vm.state.value.nextOffset)
-            vm.loadMore(); vm.state.first { !it.loadingMore }; assertEquals(4,vm.state.value.events.size)
+            vm.loadMore(); vm.state.first { !it.loadingMore }; assertEquals(3,vm.state.value.events.size)
             assertFalse(vm.state.value.hasMore); assertEquals(listOf<String?>("0","0","2","2"),offsets)
             vm.updateQuery("  Город  "); advanceTimeBy(301); vm.state.first { !it.isLoading }
             assertEquals(1,vm.state.value.total); assertEquals(1,vm.state.value.nextOffset)

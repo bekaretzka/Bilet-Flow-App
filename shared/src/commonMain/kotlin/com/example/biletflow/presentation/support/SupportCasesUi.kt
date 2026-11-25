@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
+import com.example.biletflow.presentation.events.EventContextCaption
+import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,9 +41,9 @@ data class SupportCasesState(val open:Boolean=false,val eventId:Int?=null,val ev
     val selectedId:Int?=null,val detail:SupportCase?=null,val myId:Int?=null,
     val draft:String="",val invalidDraft:Boolean=false,val sending:Boolean=false,val sendError:SupportFailure?=null,val sendUnknown:Boolean=false,
     val statusBusy:Boolean=false,val statusError:SupportFailure?=null,val statusUnknown:Boolean=false,val statusDenied:Boolean=false,
-    val unavailable:Boolean=false) {
-    /** Only a handler sees status controls: opened from the organizer's event cases and not the requester themselves. */
-    val canManageStatus:Boolean get() = eventId!=null && !statusDenied && myId!=null && detail!=null && detail.requesterUserId!=myId
+    val unavailable:Boolean=false, val handler:Boolean=false) {
+    /** Being the requester does not revoke independently verified handler rights. */
+    val canManageStatus:Boolean get() = handler && !statusDenied && myId!=null && detail!=null
 }
 
 class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,private val session:SessionStore,baseUrl:String=apiBaseUrl):ViewModel() {
@@ -72,7 +74,7 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
         sequence++;job?.cancel();caseStamp++;appliedStamp=caseStamp
         mutable.value=mutable.value.copy(open=true,selectedId=id,fromCreation=fromCreation,detail=null,loading=false,error=null,
             draft=drafts[id].orEmpty(),invalidDraft=false,sending=false,sendError=null,sendUnknown=false,
-            statusBusy=false,statusError=null,statusUnknown=false,statusDenied=false,unavailable=false)
+            statusBusy=false,statusError=null,statusUnknown=false,statusDenied=false,unavailable=false,handler=false)
         reload()
     }
     fun back() {
@@ -120,8 +122,10 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
         val stamp=++caseStamp
         val me=myId(expected)
         val item=repository.get(caseId)
+        val user=session.user.value
+        val handler=user?.isPlatformAdmin==true || item.kind=="attendee" && item.eventId!=null && user?.organizer?.status=="approved" && repository.ownsEvent(item.eventId,user.organizer.id)
         if(!live(expected,caseId)) return null
-        if(me!=null) mutable.value=mutable.value.copy(myId=me)
+        if(me!=null) mutable.value=mutable.value.copy(myId=me,handler=handler)
         return item.takeIf {applyCase(expected,caseId,stamp,it)}
     }
     private fun refreshCase(caseId:Int) {
@@ -149,7 +153,7 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
         val current=mutable.value;val caseId=current.selectedId ?: return;val detail=current.detail ?: return
         if(current.sending) return
         // backend schemas/support.py Text: strip_whitespace, then 1..5000 characters (code points)
-        val body=current.draft.trim()
+        val body=supportTrim(current.draft)
         if(supportTextLength(body) !in 1..5000) {mutable.value=current.copy(invalidDraft=true);return}
         val expected=session.generation
         val known=detail.messages.map {it.id}.toSet()
@@ -254,7 +258,7 @@ private fun CaseContext(item:SupportCase) {
     item.ticketId?.let {Text("${stringResource(Res.string.attendees_ticket)} #$it")}
 }
 @Composable
-fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,onLogin:()->Unit) {
+fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsRepository:EventsRepository?=null,onLogin:()->Unit) {
     val state by vm.state.collectAsState()
     val listState=rememberLazyListState()
     val lifecycle=LocalLifecycleOwner.current.lifecycle
@@ -305,7 +309,7 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,onLogin:()->
                 item {
                     Text("#${record.id} ${record.subject}",style=MaterialTheme.typography.titleLarge)
                     Text("${stringResource(Res.string.support_case_status)}: ${supportStatusLabel(record.status)}")
-                    CaseContext(record);Text(record.updatedAt)
+                    CaseContext(record);record.eventId?.let {EventContextCaption(it,eventsRepository)};Text(record.updatedAt)
                     if(state.canManageStatus) {
                         Text(stringResource(Res.string.support_change_status))
                         Column {

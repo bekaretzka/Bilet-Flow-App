@@ -22,7 +22,7 @@ import kotlin.test.*
 class ManualUndoTest {
     @Test fun staffUndoConflictUnknownRefreshAndBuyerState() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var undoPosts = 0
         var checkInPosts = 0
         client.plugin(HttpSend).intercept { request ->

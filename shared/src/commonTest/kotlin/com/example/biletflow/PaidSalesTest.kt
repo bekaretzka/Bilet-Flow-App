@@ -20,7 +20,7 @@ import kotlin.test.*
 class PaidSalesTest {
     @Test fun checklistRetryAccessAndRefresh() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val session = SessionStore().apply { save(AuthTokens("mock-access-token", "mock-refresh-token", "bearer")) }
         val requests = SessionOrdersRepository(OrdersRepositoryImpl(client, "http://test"), AuthRepositoryImpl(client, "http://test"), session, backgroundScope)
         val organizer = OrganizerViewModel(client, requests, session, "http://test")

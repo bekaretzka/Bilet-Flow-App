@@ -19,7 +19,7 @@ import kotlin.test.*
 class PaidSalesActivationTest {
     @Test fun activationRecoveryIsolationAndVisitorPurchase() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val counts = mutableMapOf<String, Int>()
         var hold: CompletableDeferred<Unit>? = null
         client.plugin(HttpSend).intercept { request ->

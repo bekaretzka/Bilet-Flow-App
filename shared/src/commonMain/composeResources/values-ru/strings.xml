@@ -472,23 +472,23 @@
     <string name="campaigns_empty">Кампаний пока нет</string>
     <string name="campaigns_error">Не удалось загрузить или сохранить кампанию. Данные формы сохранены.</string>
     <string name="campaigns_name">Название</string>
-    <string name="campaigns_code">Промокод</string>
+    <string name="campaigns_code">Промокод (пусто — сгенерировать)</string>
     <string name="campaigns_value">Скидка: целое число % или ₸</string>
-    <string name="campaigns_start">Начало (ISO 8601 со смещением)</string>
-    <string name="campaigns_end">Окончание (ISO 8601 со смещением)</string>
-    <string name="campaigns_limit">Лимит использований (пусто = без лимита)</string>
+    <string name="campaigns_start">Начало (необязательно)</string>
+    <string name="campaigns_end">Окончание (необязательно)</string>
+    <string name="campaigns_limit">Лимит использований</string>
     <string name="campaigns_percent">Процент</string>
     <string name="campaigns_fixed">Сумма ₸</string>
     <string name="campaigns_save">Сохранить кампанию</string>
-    <string name="campaigns_dates_help">Укажите часовой пояс явно, например 2027-01-01T10:00:00+05:00. Окончание должно быть позже начала.</string>
-    <string name="campaigns_types_help">Применимые типы билетов: ничего не выбрано — все текущие и будущие типы. Список включает скрытые.</string>
+    <string name="campaigns_dates_help">Даты необязательны. Используйте ISO 8601 со смещением UTC; окончание позже начала.</string>
+    <string name="campaigns_types_help">Доступны только платные типы. Без выбора — все платные типы мероприятия, включая будущие.</string>
     <string name="campaigns_name_error">Введите от 1 до 200 символов.</string>
-    <string name="campaigns_code_error">Код должен быть уникальным: 3–32 латинские буквы, цифры, _ или -, начало — буква или цифра. Код преобразуется в верхний регистр.</string>
-    <string name="campaigns_value_error">Введите целое число: 1–100 процентов или 1–1 000 000 000 ₸.</string>
-    <string name="campaigns_limit_error">Оставьте пустым или введите целое число от 1 до 1 000 000.</string>
+    <string name="campaigns_code_error">3–32 латинских символа, цифры или дефис. Подчёркивание запрещено. Уникален в событии; пусто — генерация.</string>
+    <string name="campaigns_value_error">Положительное целое число; процент — от 1 до 100.</string>
+    <string name="campaigns_limit_error">Пусто — без лимита, иначе положительное целое число.</string>
     <string name="campaigns_date_error">Используйте ISO 8601 с часовым поясом. Окончание должно быть позже начала.</string>
     <string name="campaigns_types_error">Выберите не более 100 типов билетов этого мероприятия.</string>
-    <string name="campaigns_unknown">Подтверждение сервера не получено. Повтор без правок использует прежний идентификатор и тело. Правка создаёт новую отправку; предыдущая кампания уже могла сохраниться.</string>
+    <string name="campaigns_unknown">Создание могло состояться. Проверьте список до новой отправки. Совпадение названия не доказывает создание; автоматического повтора нет.</string>
     <string name="catalog_more">Загрузить ещё</string>
     <string name="catalog_categories_retry">Повторить загрузку категорий</string>
     <string name="current_user_error">Не удалось загрузить профиль. Сессия сохранена; повторите запрос или откройте афишу.</string>
@@ -524,4 +524,11 @@
     <string name="support_case_failed">Сервер отклонил запрос.</string>
     <string name="support_message_result_unknown">Результат неизвестен: сообщение могло дойти или не дойти. В переписке оно не найдено, поэтому текст сохранён. Перед повторной отправкой проверьте переписку (Обновить).</string>
     <string name="support_status_unknown">Подтверждение сервера не получено. Показан статус, который сейчас сообщает сервер; автоматического повтора не было.</string>
+    <string name="event_context_unavailable">Мероприятие #%1$d недоступно</string>
+    <string name="event_context_number">Мероприятие #%1$d</string>
+    <string name="campaigns_redemptions">Использовано</string>
+    <string name="campaigns_unlimited">Без лимита</string>
+    <string name="campaigns_no_end">Без даты окончания</string>
+    <string name="campaigns_no_start">Без даты начала</string>
+    <string name="campaigns_check_list">Проверить список кампаний</string>
 </resources>

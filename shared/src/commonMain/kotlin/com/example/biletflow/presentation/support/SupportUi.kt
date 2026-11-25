@@ -21,8 +21,10 @@ import org.jetbrains.compose.resources.stringResource
 
 
 val supportCategories = attendeeCaseCategories
-fun supportTextLength(value: String): Int = value.indices.count { i ->
-    i == 0 || !value[i].isLowSurrogate() || !value[i - 1].isHighSurrogate()
+// Match Python/Pydantic str.strip(), including Unicode separators and U+001C..U+001F.
+fun supportTrim(value:String):String = value.trim {it.isWhitespace() || it=='\u0085' || it in '\u001C'..'\u001F'}
+fun supportTextLength(value:String):Int = value.indices.count {i ->
+    i==0 || !value[i].isLowSurrogate() || !value[i-1].isHighSurrogate()
 }
 data class SupportState(
     val eventId: Int? = null, val orderId: Int? = null, val ticketId: Int? = null,

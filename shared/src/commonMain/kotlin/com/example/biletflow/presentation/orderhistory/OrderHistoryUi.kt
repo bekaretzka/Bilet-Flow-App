@@ -20,6 +20,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import com.example.biletflow.presentation.events.EventContextCaption
+import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,6 +39,7 @@ import org.jetbrains.compose.resources.stringResource
 fun OrderHistoryPage(
     viewModel: OrderHistoryViewModel,
     eventNames: Map<Int, String>,
+    eventsRepository: EventsRepository? = null,
     onBack: () -> Unit,
     onLogin: () -> Unit,
     onLogout: () -> Unit,
@@ -83,6 +86,7 @@ fun OrderHistoryPage(
                     OrderHistoryCard(
                         order = order,
                         eventName = eventNames[order.eventId],
+                        eventsRepository = eventsRepository,
                         isOpening = state.openingOrderId == order.id,
                         onClick = { viewModel.openOrder(order.id) },
                     )
@@ -107,6 +111,7 @@ fun OrderHistoryPage(
 private fun OrderHistoryCard(
     order: Order,
     eventName: String?,
+    eventsRepository: EventsRepository?,
     isOpening: Boolean,
     onClick: () -> Unit,
 ) {
@@ -127,10 +132,7 @@ private fun OrderHistoryCard(
                 )
                 if (isOpening) CircularProgressIndicator(modifier = Modifier.height(20.dp), strokeWidth = 2.dp)
             }
-            eventName?.let {
-                Spacer(Modifier.height(7.dp))
-                Text(it, color = Color(0xFF6F6C72), fontSize = 15.sp)
-            }
+            EventContextCaption(order.eventId,eventsRepository)
             Spacer(Modifier.height(12.dp))
             HistoryRow(stringResource(Res.string.order_history_created), formatOrderDate(order.createdAt))
             Spacer(Modifier.height(7.dp))

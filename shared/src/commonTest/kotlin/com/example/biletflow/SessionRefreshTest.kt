@@ -48,7 +48,7 @@ class SessionRefreshTest {
 
     @Test
     fun mockRefreshTokenIsSingleUse() = runTest {
-        val client = com.example.biletflow.core.network.createMockEventsHttpClient()
+        val client = com.example.biletflow.core.network.createMockEventsHttpClient(publishedFixtureEvents = true)
         try {
             val auth = AuthRepositoryImpl(client,"http://test")
             val rotated = auth.refresh("mock-refresh-token")

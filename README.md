@@ -224,3 +224,116 @@ UI-проверка 52F (25.11.2026, только mock, MockEngine, один п�
 Неизвестный результат отправки и смены статуса через UI не воспроизводился, он проверен host-тестами.
 
 Файлы 52F: data/repositories/SupportCasesRepository.kt; presentation/support/SupportCasesUi.kt; core/network/MockEventsHttpClient.kt; удалены data/repositories/SupportRepository.kt, data/repositories/SupportStatus.kt, presentation/support/SupportHistoryUi.kt; commonTest/SupportThreadTest.kt (новый); удалены commonTest/OrganizerSupportTest.kt, SupportHistoryTest.kt, SupportMessageTest.kt, SupportStatusTest.kt; RU/EN strings.xml; docs/support-api-proposal.md; README.md. Kotlin-пути относительно shared/src/commonMain/kotlin/com/example/biletflow, тесты относительно shared/src/commonTest/kotlin/com/example/biletflow. Незакоммиченные правки 52E-check (README, SupportTest.kt) сохранены. Коммитов и push не было.
+
+### 52G — согласованность mock и недоступное мероприятие (завершён)
+
+Порог пользователя из приложенного задания: остановка при остатке ниже 20% пятичасового ИЛИ недельного лимита. Достоверный источник — get_usage_limits. На старте: 98% / 84%; последний замер при остановке: 18% пятичасового / 72% недельного. В первом прогоне порог был пересечён, работа тогда остановлена. Продолжение и завершение описаны ниже; более позднего исключения из порога нет.
+
+Начальный локальный коммит: becfcfd1fd6c77f5b963561a2e886c42255828b4. 16 файлов 52E-check/52F: README, docs/support-api-proposal, RU/EN строки, MockEventsHttpClient, SupportCasesRepository, SupportCasesUi, SupportTest, новый SupportThreadTest; удаления SupportRepository, SupportStatus, SupportHistoryUi и четырёх исторических тестов OrganizerSupport/SupportHistory/SupportMessage/SupportStatus. Проверены состав, отсутствие настоящих ключей/JWT/private keys, отсутствие local-конфигураций/build-артефактов; тестовые mock-строки сохранены. Посторонних изменений до коммита не было; неоднозначных файлов не обнаружено. 52E уже входил в HEAD, коммит содержит оставшиеся изменения 52E-check/52F. После начального коммита новых коммитов и push нет.
+
+Причина 101: ownedEvents синтезировал draft/private при чтении поверх исходного published/public mockEvents; public GET и создание заказа использовали другую ветку/исходный seed. Это разные представления seed, а не ошибка UI. Теперь все события записаны один раз в общее createdEvents-хранилище; публичные event/catalog/ticket-types/order и organizer me/manage читают его. 101 — draft/public, 102 — published/public, 103 — cancelled/unlisted. Изменения publish/unpublish/cancel отражаются везде. Каталожные дополнительные seed-события имеют другого organizer_id, чтобы не попадать в чужой /events/me. Поддержан защищённый GET /events/{id}/manage для собственных событий, в том числе draft.
+
+Правила сверены с services/event_service.py, repositories/event_repository.py, services/ticket_type_service.py, services/order_service.py и services/cancellation_service.py. Афиша: published/public, не suspended, end>=mockNow по умолчанию; include_past снимает границу конца. Categories: опубликованные public, не suspended, end строго >now. Публичная страница и ticket-types допускают unlisted, не проверяют конец; private/draft/cancelled/suspended дают 404. Создание заказа дополнительно проверяет окно регистрации, продажи типа, hidden, лимит и остаток, active paid-sales. Мок использует фиксированное now=2026-11-25T00:00:00Z. Новые заказы резервируют sold_count, отмена/refund освобождают остаток один раз; повторное создание не переиспользует ID старого заказа. Публикация по коду backend требует venue/address != null, но не требует билета или paid-sales. Оплата существующего pending не зависит от published/visibility, но блокируется suspension; её результат и QR/check-in определяются защищёнными endpoints. Старые заказы 101 сохранены как допустимая история: созданы после открытия регистрации, затем мероприятие снято с публикации. Seed №7110 создан на 102 до исчерпания бесплатного типа, остаётся доступен владельцу.
+
+| Seed-аккаунт | Роли и назначение |
+| --- | --- |
+| attendee@biletflow.kz | Отдельный посетитель, user ID 103, без organizer/admin/staff; собственный confirmed-заказ №7110 на published public 102. |
+| visitor@biletflow.kz | Существующий покупатель user ID 100; заявка даёт pending → approved через mock reload, organizer profile ID 31; владелец событий 101–103, исторические заказы. Отдельное назначение staff не требуется для собственных событий. |
+| empty@biletflow.kz | Существующий обычный пользователь, пустая история; staff только после явного назначения владельцем. |
+| history-offline@biletflow.kz | Существующий обычный пользователь для сценария ошибки истории. |
+| Зарегистрированные пользователи | Отдельные аккаунты, исходно без ролей, своей историей и последующими явными назначениями/заявками. |
+
+Существующие аккаунты не переименованы. Пароли в этот отчёт не включены. Данные/refresh/роли mock остаются в памяти процесса; сессии local/staging не менялись. Для существующих автоматических сценариев публичного 101 введён явный publishedFixtureEvents: это один согласованный опубликованный seed для всех маршрутов теста, не возврат к двум хранилищам. Multi-ticket/наличие остатка тесты настраивают через PATCH типов; sales-тест задаёт отдельно опубликованный 103 вместо попытки продаж cancelled.
+
+Зависимости клиента: история/детали заказа и QR загружают основную сущность через OrdersRepository, а не публичный Event; support — через case endpoint; check-in получает Event из /staff/events и stats/search, публичного чтения как условия доступа нет. Добавлен отдельный EventContextCaption/состояние EventContext для дополнительного GET события в истории, результате заказа, QR и support detail. При 404 — RU/EN «Мероприятие #id недоступно», при прочем сбое нейтральный номер; ошибка не скрывает основную сущность. Owner-интерфейс использует защищённый /events/me; права поддержки дополнительно подтверждаются /events/{id}/manage и organizer profile ID.
+
+Поддержка: убрано запрещающее условие requester_user_id==myId. Handler подтверждается admin-флагом либо владением событием attendee-case через /manage; тот же автор может менять статус как владелец, в том числе из собственных обращений. Посетитель/check-in staff без handler-прав не получает действие, серверный отказ сохраняется. Текст: общий KMP supportTextLength считает кодовые точки, emoji вне BMP — одна; supportTrim и mock одинаково обрезают whitespace. Проверены пустые пробелы, обычный текст, 5000 и 5001 emoji. Расхождения и вопросы закреплены в docs/backend-api-gaps.md «Вопросы по 52F–52G»: права автора-владельца, nullable author_user_id, trim/кодовые точки, порядок messages по ID, разница видимости/lifecycle. Runtime backend для экзотических whitespace не проверен: python.exe в текущем PATH недоступен; Unicode-контрольные пробелы требуют подтверждения backend-командой.
+
+Автоматически: все 88 host-тестов, assembleDebug и assembleRelease — BUILD SUCCESSFUL. Новые MockConsistencyTest: единое состояние и transitions, seed-посетитель со своим заказом, unlisted/private/draft/cancelled/suspended, include_past/categories, основная история/QR после public 404, сохранность заказа после unpublish, cancel даёт актуальный статус; emoji/trim и 5000/5001; резервирование/отмена/уникальные ID. SupportThreadTest теперь проверяет owner-requester handler и серверный отказ. Старые fixtures исправлены без обхода endpoint-проверок. После изменений периодов/статусов тесты не создают заказы на cancelled, вне окна или сверх лимита. Дополнительный preview события не тестировался инструментальным Compose-тестом, его отказ проверен вместе с успешными основными VM/HTTP.
+
+UI: один процесс приложения с MockEngine, Resizable_Experimental / emulator-5554 / Android 16. При первом чтении null root node; повторное пробуждение/чтение помогло. dumpsys activity lastanr: no ANR since boot. Посторонние приложения не закрывались.
+- a) Пройдено: афиша начинается с 102, 101 отсутствует; attendee вошёл, видит только свой №7110; профиль ID 103 без organizer/check-in.
+- b) Пройдено: выход/вход visitor в том же процессе, заявка и approved, My events → Retry предусмотренной mock-ошибки → 101 draft/public → Publish → Confirm. Показано Unpublish и сообщение о появлении в каталоге. Дополнительных условий не потребовалось (venue/address в seed есть).
+- c) Пройдено при продолжении: сохранённый процесс PID 9879, attendee на прежней Order review одного бесплатного 1002. Через Buyer name → Create order получен серверный orderId=7200, confirmed, Free, билет valid. Найден и оформлен именно опубликованный 101.
+- d) Пройдено: выход attendee → вход visitor → My events → 101 → Unpublish → Confirm. Экран владельца показал «Event is now a draft», появилась кнопка Publish.
+- e) Пройдено: повторный вход attendee → My orders → Order #7200. Показано «Event #101 unavailable», но №7200, confirmed, Free и билет valid остаются доступны. Основной заказ не скрыт дополнительным public Event 404.
+- f) Пройдено: visitor → 101 → Cancel event → подтверждение. Экран владельца показал Event cancelled. После нового входа attendee и обновления My orders тот же №7200 показан Cancelled; актуальные детали — Order cancelled, Free, Event #101 unavailable. Действий повторной отмены и открытия билета нет. №7110 на другом событии остался confirmed.
+
+Реальный сервер не проверялся этим шагом: подтверждённого staging URL нет, последняя проверка /health ранее давала 404. Новые результаты относятся к MockEngine/исходникам. iOS и камера остаются непроверенными. Кампании, промокоды, Campaign QR, PDF, журнал, аналитика и дублирование в 52G не мигрировались.
+
+Изменённые файлы 52G (полные пути относительно репозитория):
+- docs/backend-api-gaps.md
+- shared/src/commonMain/composeResources/values-ru/strings.xml
+- shared/src/commonMain/composeResources/values/strings.xml
+- shared/src/commonMain/kotlin/com/example/biletflow/App.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/core/network/MockEventsHttpClient.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/data/repositories/SupportCasesRepository.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/events/EventContext.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/orderhistory/OrderHistoryUi.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/orderreview/OrderResultUi.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/orderreview/TicketQrUi.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/support/SupportCasesUi.kt
+- shared/src/commonMain/kotlin/com/example/biletflow/presentation/support/SupportUi.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/AttendeesTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/CampaignsTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/CheckInOverviewTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/CurrentUserTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/EventDetailsTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/EventSalesTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/EventsCatalogTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/EventSettingsCopyTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/EventStaffTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/ManualCheckInTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/ManualUndoTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/MockConsistencyTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/MockFixtureSetup.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/OrganizerOrdersTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/OrganizerRefundTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/OrganizerRequirementsTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/OrganizerTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/OrganizerTicketTypesTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/PaidSalesActivationTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/PaidSalesTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/SessionRefreshTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/StaffEventsTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/SupportTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/SupportThreadTest.kt
+- shared/src/commonTest/kotlin/com/example/biletflow/VisitorCheckoutTest.kt
+
+Историческая точка остановки первого прогона 52G (снята продолжением пользователя): get_usage_limits показал usedPercent=82 за 300 минут (остаток 18%), weekly usedPercent=28 (остаток 72%). Дальнейший UI и исправления не выполняются по условию пользователя. a/b пройдены, c остановлен перед POST, d/e/f не выполнены. Эмулятор оставлен на Order review под attendee; перед продолжением проверить фактический UI и сохранность того же процесса. Если процесс будет потерян, mock-состояние потребуется восстановить и UI a–f повторить. Начальный коммит единственный; новые изменения 52G не коммитились, push нет. Основная реализация собрана и host-проверена; незавершённый UI не заменяется успешными тестами. Последние дополнения остатков/уникальных ID проверены host-тестами и сборками, но APK в уже идущем процессе UI не переустанавливался, чтобы сохранить one-process сценарий.
+
+README.md также изменён в 52G и входит в перечень файлов. Изменения сессий, окружений local/staging и Gradle не делались. Других пользовательских приложений не закрывали. Следующие блоки не начинались.
+#### Завершение UI-проверки 52G
+
+Пользователь явно поручил продолжить с точки остановки, сохранив порог ниже 20% пятичасового или недельного остатка. Достоверный замер перед продолжением: 98% пятичасового / 36% недельного. Порог не пересекался; сбросы лимитов/покупки кредитов не выполнялись. Предыдущая остановка и прежние значения выше сохранены как история первого прогона.
+
+Устройство: Resizable_Experimental, emulator-5554, Android 16, debug с MockEngine. Процесс PID 9879 сохранился на прежней Order review; APK не переустанавливался, force-stop/restart/очистка данных не выполнялись. Весь сценарий a–f теперь выполнен в одном процессе, с переключением существующих аккаунтов через UI. Серверный mock-orderId нового бесплатного заказа — **7200**, eventId=101. Переход статусов: confirmed после создания → confirmed после unpublish → cancelled после отмены события. На шагах e и f дополнительная public-страница события недоступна, но защищённый заказ открывается. Подмена code/orderId или прямые HTTP-мутации для UI-прогона не использовались.
+
+В продолжении функциональных дефектов сценария c–f не обнаружено, исходный код не изменялся. После выхода дважды возвращался null root node от UIAutomator: повторное чтение восстановилось, pidof неизменно 9879, dumpsys activity lastanr — no ANR has occurred since boot. Это технический сбой чтения UI, а не подтверждённый ANR приложения. Другие приложения пользователя не закрывались; отказов автоматической проверки разрешений не было.
+
+Ранее выполненные **88 host-тестов**, **assembleDebug** и **assembleRelease** сохранены как выполненные проверки реализации; существующий XML-отчёт подтверждает 88 тестов, 0 ошибок. Повторный запуск тестов/сборок в этом продолжении не требовался, поскольку менялся только README. Коммит becfcfd1fd6c77f5b963561a2e886c42255828b4 сохранён; новых коммитов и push нет. Файл, изменённый при продолжении: README.md; прежний список изменений 52G выше сохранён.
+
+Ограничения: результаты относятся к установленной debug-сборке с MockEngine; это не подтверждение подключения настоящего backend. Подтверждённого staging URL по-прежнему нет. Последние корректировки остатков/уникальных ID, не установленные в сохранённый UI-процесс ранее, проверены 88 host-тестами и сборками, а не этим UI-прогоном. iOS и открытые проверки камеры Android/iOS остаются отдельно непроверенными. Кампании и следующие блоки миграции не начинались. 52G завершён после c–f; приложение оставлено в деталях отменённого заказа №7200.
+Итоговый достоверный замер лимита при завершении продолжения: **52% пятичасового / 29% недельного остатка**. Оба выше действующего порога 20%.
+
+### 52H — кампании по контракту backend (UI-проверка ожидается)
+
+Источники: BiletFlow-main/docs/api-reference.md, backend/schemas/campaign.py, services/campaign_service.py. GET/POST /events/{id}/campaigns заменили предложенный /organizer/events/{id}/campaigns; GET возвращает Campaign[], cursor/next_cursor/limit удалены из блока. DTO содержит nullable starts_at/ends_at/max_redemptions, redemptions_count, is_active, link, link_opens, stats {orders,tickets,gross,discount,net}, типы и дату создания. Суммы/счётчики читаются как Long. Старое предложение явно помечено историческим в docs/promotions-api-proposal.md.
+
+Форма: max_redemptions вместо usage_limit; код и обе даты необязательны. Пустой код передаётся как отсутствие значения/null для генерации сервером; пользовательский код 3–32 A–Z/a–z/цифры/дефис, underscore запрещён, uppercase, уникальность внутри event. Даты ISO со смещением, если обе заданы — start<end. Значение скидки положительное целое, percent<=100; прежние искусственные пределы fixed<=1e9 и лимита<=1e6 убраны. UI приводит name/code и поля к trim; backend schema name сама trim не требует. Выбор типов из полного organizer /manage фильтруется price>0 (скрытые платные не исключаются), пусто — все платные типы этого события, включая будущие. Бесплатный тип и чужой event отклоняются mock как 400 InvalidCampaignError, код внутри event — 409 PromoCodeAlreadyExistsError; создание на cancelled — InvalidEventStatusError.
+
+client_request_id/снимок идемпотентности удалены. Двойное нажатие блокируется, успешное создание обновляет серверный список. При ошибках поля и ввод сохраняются. После неизвестного результата повтор блокируется, предлагается «Проверить список кампаний», показываются серверные ID/код; совпадение имени не доказывает создание. После редактирования предупреждение предыдущей неизвестной операции остаётся. Закрытие и новая форма — новая осознанная отправка, которая может создать ещё одну кампанию; автоматического POST после транспортного сбоя нет. Общий single-flight refresh повторяет только после явного 401; suspension использует существующую очистку сессии; поколение/epoch защищают от старых ответов.
+
+MockEngine: актуальный маршрут, массив, единые события/типы 52G; approved-владелец, event и paid-типы проверяются. Код генерируется длиной 8 с алфавитом backend без похожих 0/O/1/I/L, уникален в event; одинаковый выбранный код допускается у разных событий. link у mock использует http://localhost:5173 с непрозрачным mock-token. redemptions_count/link_opens/stats новых кампаний нулевые: применение кодов к заказу, Campaign QR, чтение/редактирование/отключение отдельной кампании и отчётность вне 52H. Список и форма читают новые поля; это не реализация будущих операций. Сценарии: campaign-unknown сохраняет запись и теряет ответ; campaign-offline имитирует транспортный сбой; зарегистрированный suspend-on-campaigns@biletflow.kz блокируется при защищённом маршруте кампаний.
+
+Проверки: :shared:testAndroidHostTest :androidApp:assembleDebug :androidApp:assembleRelease — BUILD SUCCESSFUL; 89 тестов, 0 ошибок. CampaignsTest обновлён (3): массив и DTO, процентная/фиксированная (включая >старого лимита), отсутствие дат, генерация, max_redemptions, одинаковый код в разных событиях/конфликт в одном, underscore/короткий код/числа/даты, paid/free/foreign типы, пустая применимость, refresh/права, retry списка, двойное нажатие, потерянный ответ с одним сохранением и без второго POST, очистка после смены аккаунта, suspension. После согласования алфавита mock-генерации и удаления trailing whitespace повторный прогон также завершился BUILD SUCCESSFUL: 89 host-тестов, Android debug/release успешны.
+
+UI пока не выполнен на APK 52H. Осталось: установить актуальный debug mock на доступный AVD; войти владельцем visitor, при новом процессе подать заявку/approved; открыть published 102 → Promotional campaigns; создать процентную и фиксированную кампании без дат, одну с автокодом, повторно открыть список, проверить сохранённые значения. Создание на 101 из прошлого процесса не подходит: он был отменён в 52G. Перед продолжением проверить фактический статус/процесс; новый процесс seed снова draft 101 и published 102. Не считать host-тесты ручной UI-проверкой.
+
+Лимиты: действующий порог ниже 20% пятичасового ИЛИ недельного остатка; на старте 45%/28%, последний замер перед финальным прогоном 25%/24%. Проверять get_usage_limits перед продолжением, при пересечении порога остановиться с точной точкой состояния. Коммитов/push нет, предыдущие изменения 52G и Gradle сохранены. Настоящее подключение кампаний не проверено: подтверждённого staging URL нет, результаты относятся к MockEngine и источникам backend. iOS не проверялся на Windows.
+
+Файлы 52H: shared/src/commonMain/kotlin/com/example/biletflow/data/repositories/CampaignsRepository.kt; presentation/organizer/CampaignsUi.kt и core/network/MockEventsHttpClient.kt в том же commonMain package; shared/src/commonTest/kotlin/com/example/biletflow/CampaignsTest.kt; RU/EN composeResources/strings.xml; docs/promotions-api-proposal.md; README.md. Редактирование/отключение кампаний не начинались.
+
+Контрольная точка 52H: adb devices подтверждает emulator-5554 в состоянии device. APK 52H на эмулятор пока не устанавливался, UI-создание двух кампаний и повторное открытие списка не выполнены. Последний замер: 20% пятичасового / 24% недельного. Не объявлять UI проверенным; перед продолжением проверить лимит и состояние устройства. Новых коммитов/push нет.
+
+Остановка 52H по условию пользователя: get_usage_limits показал остаток **18% пятичасового / 23% недельного**, пятичасовой порог ниже 20%. После этого изменения кода и UI-проверки не выполняются. Последний полный прогон успешен (89 host-тестов, debug/release). Следующий разрешённый этап после восстановления лимита — UI двух кампаний на событии 102 с повторным открытием списка. Кампании редактирования/отключения не начинались. Реальная интеграция не подтверждена.

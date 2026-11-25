@@ -320,7 +320,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
         Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
             campaignsState.eventId != null && !showLogin -> CampaignsPage(campaignsVm)
-            supportHistoryState.open && !showLogin -> SupportCasesPage(supportHistoryVm, session != null) {
+            supportHistoryState.open && !showLogin -> SupportCasesPage(supportHistoryVm, session != null, eventsRepository) {
                 loginForHistory = false; authViewModel.closeLoginFlow(); showLogin = true
             }
             supportState.eventId != null && !showLogin -> SupportPage(supportVm, session != null, onOpenRequest = { supportHistoryVm.select(it, fromCreation = true) }, onCheckCases = { supportHistoryVm.open() }) {
@@ -374,6 +374,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 )
                 TicketQrPage(
                     ticket = ticket,
+                    eventsRepository = eventsRepository,
                     typeName = eventDetailsState.ticketTypes
                         .firstOrNull { it.id == ticket.ticketTypeId }?.name,
                     viewModel = ticketQrViewModel,
@@ -386,6 +387,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
             }
             completedOrder != null -> OrderResultPage(
                 order = requireNotNull(completedOrder),
+                eventsRepository = eventsRepository,
                 viewModel = paymentViewModel,
                 onOrderUpdated = { completedOrder = it },
                 onLogin = {
@@ -463,6 +465,7 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 onLogout = logout,
                 viewModel = orderHistoryViewModel,
                 eventNames = eventsState.events.associate { it.id to it.title },
+                eventsRepository = eventsRepository,
                 onBack = {
                     selectedTab = 0
                     showOrderHistory = false

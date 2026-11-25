@@ -25,7 +25,7 @@ import kotlin.test.*
 class OrganizerRefundTest {
     @Test fun refundContractOwnershipAndDownstreamReads() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val reasons = mutableListOf<String>()
         client.plugin(HttpSend).intercept { request ->
             if (request.url.build().encodedPath.endsWith("/refund")) {

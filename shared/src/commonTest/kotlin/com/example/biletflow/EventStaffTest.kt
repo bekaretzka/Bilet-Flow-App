@@ -22,7 +22,7 @@ import kotlin.test.*
 class EventStaffTest {
     @Test fun assignmentsErrorsRecoveryRefreshAndOwnership() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var posts = 0
         val deletions = mutableListOf<String>()
         client.plugin(HttpSend).intercept { request ->

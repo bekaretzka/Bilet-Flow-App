@@ -23,7 +23,7 @@ import kotlin.test.*
 class EventSalesTest {
     @Test fun freePendingPaidCancelledAndRefundedOrders() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true,seedPublishedEventIds=setOf(103))
         val session = SessionStore().apply { save(AuthTokens("mock-access-token", "mock-refresh-token", "bearer")) }
         val orders = OrdersRepositoryImpl(client, "http://test")
         val requests = SessionOrdersRepository(orders, AuthRepositoryImpl(client, "http://test"), session, backgroundScope)

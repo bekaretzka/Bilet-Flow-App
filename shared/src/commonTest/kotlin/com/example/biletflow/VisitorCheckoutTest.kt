@@ -10,7 +10,7 @@ import kotlin.test.*
 
 class VisitorCheckoutTest {
     @Test fun registeredBuyerCanPayReadQrAndCancelWithAccountIsolation() = runTest {
-        val client = createMockEventsHttpClient(visitorCheckoutReady = true)
+        val client = createMockEventsHttpClient(visitorCheckoutReady = true, publishedFixtureEvents = true)
         val auth = AuthRepositoryImpl(client, "http://test")
         val orders = OrdersRepositoryImpl(client, "http://test")
         try {

@@ -50,6 +50,7 @@ class EventSettingsCopyTest {
             runCurrent(); organizer.openForm(); organizer.apply(); organizer.state.first { !it.loading }
             repeat(3) { organizer.load(); organizer.state.first { !it.loading } }
             events.open(); events.state.first { !it.loading }; events.reload(); events.state.first { !it.loading }
+            prepareTicketFixture(client)
             val registration = OrdersRepositoryImpl(client, "http://test").createOrder(102, "Original attendee", listOf(CreateOrderItem(2001, 1)), "mock-access-token")
             assertEquals("confirmed", registration.status)
             assertEquals(201, client.post("http://test/events/102/staff") {

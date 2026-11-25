@@ -1,101 +1,76 @@
 package com.example.biletflow
-
 import androidx.lifecycle.viewModelScope
 import com.example.biletflow.core.network.createMockEventsHttpClient
 import com.example.biletflow.data.repositories.*
 import com.example.biletflow.domain.models.AuthTokens
 import com.example.biletflow.domain.session.SessionStore
-import com.example.biletflow.presentation.organizer.CampaignsViewModel
-import com.example.biletflow.presentation.organizer.OrganizerViewModel
+import com.example.biletflow.presentation.organizer.*
 import io.ktor.client.plugins.*
 import io.ktor.http.*
 import io.ktor.http.content.OutgoingContent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
+import kotlinx.serialization.json.*
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CampaignsTest {
-    private fun input(n: Int)=CampaignCreate("Campaign $n","CODE$n","percent",25,"2027-01-01T10:00:00+05:00","2027-02-01T10:00:00+05:00",
-        clientRequestId="00000000-0000-4000-8000-${n.toString().padStart(12,'0')}")
-    @Test fun contractDiscountsValidationIdempotencyPaginationRefreshAndOwnership() = runTest {
+    private fun input(code:String?="SAVE")=CampaignCreate("Campaign",code,"percent",25)
+    @Test fun currentArrayContractOptionalFieldsCodesPaidTypesAndAccess()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
-        val session=SessionStore().apply { save(AuthTokens("mock-access-token","mock-refresh-token","bearer")) }
-        val auth=AuthRepositoryImpl(client,"http://test")
-        val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,session,backgroundScope)
-        val repo=CampaignsRepository(client,requests,"http://test")
-        val organizer=OrganizerViewModel(client,requests,session,"http://test")
+        val client=createMockEventsHttpClient();val store=SessionStore().apply {save(AuthTokens("mock-access-token","mock-refresh-token","bearer"))}
+        val auth=AuthRepositoryImpl(client,"http://test");val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)
+        val repo=CampaignsRepository(client,requests,"http://test");val organizer=OrganizerViewModel(client,requests,store,"http://test")
+        client.plugin(HttpSend).intercept {request ->assertFalse(request.url.build().encodedPath.startsWith("/organizer/"));assertNull(request.url.parameters["cursor"]);execute(request)}
         try {
-            runCurrent(); organizer.openForm(); organizer.apply(); organizer.state.first { !it.loading }
-            repeat(3) { organizer.load(); organizer.state.first { !it.loading } }
-            assertTrue(repo.list(101).items.isEmpty())
-            val percent=repo.create(101,input(1).copy(ticketTypeIds=listOf(1001)))
-            assertEquals(25L,percent.discountValue); assertEquals("percent",percent.discountType)
-            assertEquals(percent,repo.create(101,input(1).copy(ticketTypeIds=listOf(1001))))
-            val fixed=repo.create(101,input(2).copy(discountType="fixed",discountValue=500,usageLimit=10))
-            assertEquals(500L,fixed.discountValue); assertEquals(10,fixed.usageLimit); assertTrue(fixed.ticketTypeIds.isEmpty())
-            assertEquals(409,assertFailsWith<CampaignApiException> { repo.create(101,input(1).copy(name="Changed")) }.status)
-            assertEquals("CampaignCodeAlreadyExistsError",assertFailsWith<CampaignApiException> { repo.create(102,input(3).copy(code="code1")) }.code)
-            for(invalid in listOf(input(4).copy(discountValue=101),input(4).copy(discountType="fixed",discountValue=0),input(4).copy(usageLimit=0),input(4).copy(endsAt=input(4).startsAt),input(4).copy(startsAt="2027-01-01T10:00:00"),input(4).copy(ticketTypeIds=listOf(2001)))) {
-                assertEquals(422,assertFailsWith<CampaignApiException> { repo.create(101,invalid) }.status)
+            runCurrent();organizer.openForm();organizer.apply();organizer.state.first {!it.loading};repeat(3) {organizer.load();organizer.state.first {!it.loading}}
+            assertTrue(repo.list(101).isEmpty())
+            val percent=repo.create(101,input().copy(ticketTypeIds=listOf(1001)))
+            assertEquals(25L,percent.discountValue);assertNull(percent.startsAt);assertNull(percent.endsAt);assertNull(percent.maxRedemptions)
+            assertTrue(percent.isActive);assertEquals(0L,percent.redemptionsCount);assertEquals(0L,percent.linkOpens);assertTrue(percent.link.contains("/events/101?campaign="));assertEquals(0L,percent.stats.net)
+            val fixed=repo.create(101,input(null).copy(discountType="fixed",discountValue=2_000_000_000,maxRedemptions=2_000_001))
+            assertEquals(8,fixed.code.length);assertTrue(Regex("[A-Z0-9-]{3,32}").matches(fixed.code));assertEquals(2_000_001L,fixed.maxRedemptions);assertTrue(fixed.ticketTypeIds.isEmpty())
+            assertEquals("PromoCodeAlreadyExistsError",assertFailsWith<CampaignApiException> {repo.create(101,input("save"))}.code)
+            assertEquals("SAVE",repo.create(102,input("save")).code)
+            for(bad in listOf(input("BAD_CODE"),input("AA"),input().copy(discountValue=101),input().copy(maxRedemptions=0),input().copy(discountType="fixed",discountValue=0),input().copy(startsAt="2027-02-01T10:00:00Z",endsAt="2027-01-01T10:00:00Z"))) {
+                assertEquals(422,assertFailsWith<CampaignApiException> {repo.create(101,bad)}.status)
             }
-            assertFails { repo.create(101,input(5).copy(name="campaign-unknown")) }
-            val recovered=repo.create(101,input(5).copy(name="campaign-unknown"))
-            assertEquals(recovered,repo.create(101,input(5).copy(name="campaign-unknown")))
-            val page1=repo.list(101,limit=1); val page2=repo.list(101,page1.nextCursor,1); val page3=repo.list(101,page2.nextCursor,1)
-            assertEquals(listOf(recovered.id,fixed.id,percent.id),(page1.items+page2.items+page3.items).map { it.id }); assertNull(page3.nextCursor)
-            assertTrue(repo.list(102).items.isEmpty())
-            session.rotateTokens(AuthTokens("expired-access","mock-refresh-token","bearer"))
-            assertEquals(3,repo.list(101).items.size); assertTrue(session.tokens.value!!.accessToken.startsWith("mock-rotated-access"))
-            session.save(auth.login("empty@biletflow.kz","password123")); runCurrent()
-            assertEquals(403,assertFailsWith<CampaignApiException> { repo.list(101) }.status)
-            assertEquals(403,assertFailsWith<CampaignApiException> { repo.create(101,input(7)) }.status)
-        } finally { organizer.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain() }
+            for(type in listOf(1002,2002)) assertEquals("InvalidCampaignError",assertFailsWith<CampaignApiException> {repo.create(101,input("TYPE-$type").copy(ticketTypeIds=listOf(type)))}.code)
+            store.rotateTokens(AuthTokens("expired-access","mock-refresh-token","bearer"));assertEquals(2,repo.list(101).size)
+            assertTrue(store.tokens.value!!.accessToken.startsWith("mock-rotated-access"))
+            store.save(auth.login("empty@biletflow.kz","password123"));assertFailsWith<CampaignApiException> {repo.list(101)}
+        } finally {organizer.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
     }
-
-    @Test fun formLostResponseDoubleClickFieldsAndLateAccountResponse() = runTest {
+    @Test fun retryDoubleClickUnknownResultAndSessionIsolation()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
-        val session=SessionStore().apply { save(AuthTokens("mock-access-token","mock-refresh-token","bearer")) }
-        val auth=AuthRepositoryImpl(client,"http://test")
-        val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,session,backgroundScope)
-        val organizer=OrganizerViewModel(client,requests,session,"http://test")
-        val vm=CampaignsViewModel(client,requests,session,"http://test")
-        val bodies=mutableListOf<String>()
-        var gate: CompletableDeferred<Unit>?=null
-        var failList=true
-        client.plugin(HttpSend).intercept { request ->
+        val client=createMockEventsHttpClient();val store=SessionStore().apply {save(AuthTokens("mock-access-token","mock-refresh-token","bearer"))}
+        val auth=AuthRepositoryImpl(client,"http://test");val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)
+        val organizer=OrganizerViewModel(client,requests,store,"http://test");val vm=CampaignsViewModel(client,requests,store,"http://test")
+        var fail=true;var posts=0;val gate=CompletableDeferred<Unit>()
+        client.plugin(HttpSend).intercept {request ->
             if(request.url.build().encodedPath.endsWith("/campaigns")) {
-                if(request.method == HttpMethod.Get && failList) { failList=false; throw kotlinx.io.IOException("Mock offline list") }
-                if(request.method == HttpMethod.Post) { bodies.add((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()); gate?.await() }
-            }
-            execute(request)
+                if(request.method==HttpMethod.Get && fail) {fail=false;throw kotlinx.io.IOException("List offline")}
+                if(request.method==HttpMethod.Post) {posts++;val body=Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject;assertFalse("client_request_id" in body);assertFalse("usage_limit" in body);gate.await()}
+            };execute(request)
         }
         try {
-            runCurrent(); organizer.openForm(); organizer.apply(); organizer.state.first { !it.loading }
-            repeat(3) { organizer.load(); organizer.state.first { !it.loading } }
-            vm.open(101,"Event"); vm.state.first { !it.loading }; assertNotNull(vm.state.value.error)
-            vm.retry(); vm.state.first { !it.loading }; assertNull(vm.state.value.error)
-            vm.createForm(); vm.state.first { !it.typesLoading }; assertNull(vm.state.value.typesError)
-            assertTrue(vm.state.value.types.isNotEmpty())
-            vm.save(); assertTrue("name" in vm.state.value.fields); assertTrue(bodies.isEmpty())
-            vm.update("name","campaign-unknown"); vm.update("code","  UI51  "); vm.update("discount_value","15")
-            vm.update("starts_at","2027-01-01T10:00:00+05:00"); vm.update("ends_at","2027-02-01T10:00:00+05:00")
-            vm.toggle(1001); gate=CompletableDeferred(); vm.save(); vm.save(); runCurrent(); assertEquals(1,bodies.size)
-            gate!!.complete(Unit); gate=null; vm.state.first { !it.saving }
-            assertTrue(vm.state.value.unknown); assertEquals("campaign-unknown",vm.state.value.values["name"])
-            vm.save(); vm.state.first { !it.saving && !it.loading }
-            assertEquals(bodies[0],bodies[1]); assertFalse(vm.state.value.form); assertEquals(1,vm.state.value.items.size)
-            assertEquals("UI51",vm.state.value.items.single().code)
-            vm.createForm(); vm.state.first { !it.typesLoading }
-            vm.update("name","Late"); vm.update("code","LATE51"); vm.update("discount_value","5")
-            vm.update("starts_at","2027-01-01T10:00:00+05:00"); vm.update("ends_at","2027-02-01T10:00:00+05:00")
-            gate=CompletableDeferred(); vm.save(); runCurrent()
-            session.save(auth.login("empty@biletflow.kz","password123")); runCurrent()
-            assertNull(vm.state.value.eventId); assertTrue(vm.state.value.values.isEmpty())
-            gate!!.complete(Unit); gate=null; runCurrent(); assertTrue(vm.state.value.items.isEmpty())
-        } finally { gate?.complete(Unit); vm.viewModelScope.cancel(); organizer.viewModelScope.cancel(); runCurrent(); client.close(); Dispatchers.resetMain() }
+            runCurrent();organizer.openForm();organizer.apply();organizer.state.first {!it.loading};repeat(3) {organizer.load();organizer.state.first {!it.loading}}
+            vm.open(101,"Event");vm.state.first {!it.loading};assertNotNull(vm.state.value.error);vm.retry();vm.state.first {!it.loading};assertNull(vm.state.value.error)
+            vm.createForm();vm.state.first {!it.typesLoading};assertTrue(vm.state.value.types.all {it.price>0});vm.toggle(1002);assertTrue(vm.state.value.selected.isEmpty())
+            vm.update("name","campaign-unknown");vm.update("discount_value","20");vm.save();vm.save();runCurrent();assertEquals(1,posts)
+            gate.complete(Unit);vm.state.first {!it.saving};assertTrue(vm.state.value.unknown);assertEquals("campaign-unknown",vm.state.value.values["name"])
+            vm.save();runCurrent();assertEquals(1,posts);vm.reload();vm.state.first {!it.loading};assertEquals(1,vm.state.value.items.size);assertTrue(vm.state.value.unknown)
+            store.save(auth.login("empty@biletflow.kz","password123"));runCurrent();assertNull(vm.state.value.eventId);assertTrue(vm.state.value.items.isEmpty());assertTrue(vm.state.value.values.isEmpty())
+        } finally {gate.complete(Unit);vm.viewModelScope.cancel();organizer.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
+    }
+    @Test fun suspensionEndsSession()=runTest {
+        val client=createMockEventsHttpClient()
+        try {
+            val auth=AuthRepositoryImpl(client,"http://test");auth.register("suspend-on-campaigns@biletflow.kz","password123")
+            val store=SessionStore().apply {save(auth.login("suspend-on-campaigns@biletflow.kz","password123"))}
+            val requests=SessionOrdersRepository(OrdersRepositoryImpl(client,"http://test"),auth,store,backgroundScope)
+            assertFailsWith<OrdersApiException> {CampaignsRepository(client,requests,"http://test").list(101)};assertNull(store.tokens.value);assertTrue(store.suspended.value)
+        } finally {client.close()}
     }
 }

@@ -62,6 +62,10 @@ class SupportCasesRepository(private val client:HttpClient,private val requests:
     suspend fun eventInbox(eventId:Int):List<SupportCase> = inbox().filter { it.eventId==eventId }
     suspend fun get(id:Int):SupportCase = read<SupportCase>("/support/cases/$id").also { require(it.id==id) }
     suspend fun me():CurrentUser = read("/auth/me")
+    suspend fun ownsEvent(eventId:Int,organizerId:Int):Boolean {
+        return try { read<com.example.biletflow.domain.models.Event>("/events/$eventId/manage").organizerId==organizerId }
+        catch(error:Exception) { if(error is kotlinx.coroutines.CancellationException) throw error; false }
+    }
     /** POST /support/cases/{id}/messages with only {"body"}; never retried automatically. */
     suspend fun send(id:Int,body:String):SupportCaseMessage = requests.request { token ->
         val response=client.post("$baseUrl/support/cases/$id/messages") {

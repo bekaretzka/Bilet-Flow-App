@@ -35,7 +35,7 @@ import com.example.biletflow.data.repositories.CampaignCreate
 import com.example.biletflow.data.repositories.validateCampaign
 
 // The app enables a ready-to-buy concert; activation tests keep the incomplete checklist fixtures.
-fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPageFixtures: Boolean = false): HttpClient {
+fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPageFixtures: Boolean = false, publishedFixtureEvents: Boolean = false, seedPublishedEventIds: Set<Int> = emptySet(), seedSuspendedEventIds: Set<Int> = emptySet()): HttpClient {
     val catalogExtra = if(catalogPageFixtures) (1..25).map { n -> buildJsonObject {
         mockEvents.first().jsonObject.forEach { (key,value) -> put(key,value) }
         put("id",10000+n); put("title",if(n==25) "Дальний спектакль" else "Каталог $n")
@@ -44,12 +44,49 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
         put("start_time","2027-04-01T10:00:00+05:00"); put("end_time","2027-04-01T12:00:00+05:00")
         put("image_url",JsonNull); put("lifecycle","upcoming"); put("suspended_at",JsonNull); put("suspension_reason",JsonNull)
     } } else emptyList()
-    fun catalogPublic(changed: List<JsonObject>) = ((mockEvents.map { it.jsonObject } + catalogExtra).filter { base -> changed.none { it["id"] == base["id"] } } + changed)
-        .filter { it["status"]?.jsonPrimitive?.content == "published" && it["visibility"]?.jsonPrimitive?.content == "public" && (it["suspended_at"] == null || it["suspended_at"] == JsonNull) }
     val organizerProfiles = mutableMapOf<String, String>()
     val createdTicketTypes = mutableMapOf<String, MutableList<JsonObject>>()
     var nextTicketTypeId = 3000
+    // One event store for every route. Seed status is written once, never synthesized on read.
     val createdEvents = mutableMapOf<String, MutableList<JsonObject>>()
+    val seeded = mockEvents.map { it.jsonObject }.map { base -> buildJsonObject {
+        base.forEach { (k,v) -> put(k,v) }
+        put("organizer_id",if(base.getValue("id").jsonPrimitive.int in 101..103) 31 else 99)
+        if(base.getValue("id").jsonPrimitive.int in seedSuspendedEventIds) put("suspended_at","2026-11-24T00:00:00Z")
+        when(base.getValue("id").jsonPrimitive.int) {
+            101 -> {put("status",if(publishedFixtureEvents) "published" else "draft");put("visibility","public")}
+            103 -> {put("status",if(103 in seedPublishedEventIds) "published" else "cancelled");put("visibility",if(103 in seedPublishedEventIds) "public" else "unlisted")}
+        }
+    } }
+    createdEvents["Bearer mock-access-token"] = seeded.take(3).toMutableList()
+    createdEvents["catalog-seed"] = (seeded.drop(3)+catalogExtra.map { row -> buildJsonObject {row.forEach { (k,v)->put(k,v) };put("organizer_id",99)} }).toMutableList()
+    fun allEvents() = createdEvents.values.flatten()
+    fun eventById(id:Int) = allEvents().firstOrNull {it["id"]?.jsonPrimitive?.int==id}
+    fun publicPage(event:JsonObject?) = event!=null && event["status"]?.jsonPrimitive?.content=="published" &&
+        event["visibility"]?.jsonPrimitive?.content!="private" && (event["suspended_at"]==null || event["suspended_at"]==JsonNull)
+    fun catalogPublic() = allEvents().filter {publicPage(it) && it["visibility"]?.jsonPrimitive?.content=="public"}
+    val now = Instant.parse("2026-11-25T00:00:00Z")
+    fun eventTypes(id:Int):List<JsonObject> {
+        val base=when(id) {101->MOCK_EVENT_101_TICKET_TYPES_JSON;102->MOCK_EVENT_102_TICKET_TYPES_JSON;else->"[]"}
+        val changed=createdTicketTypes.values.flatten().filter {it["event_id"]?.jsonPrimitive?.int==id}
+        return (changed+Json.parseToJsonElement(base).jsonArray.map {it.jsonObject}).distinctBy {it["id"]}
+    }
+    val reservedOrders=mutableSetOf(7101,7102,7103,7110)
+    fun changeInventory(order:JsonObject,reserve:Boolean) {
+        val id=order.getValue("id").jsonPrimitive.int
+        if(reserve) {if(!reservedOrders.add(id)) return} else if(!reservedOrders.remove(id)) return
+        val eventId=order.getValue("event_id").jsonPrimitive.int
+        val owner=createdEvents.entries.firstOrNull {(_,rows)->rows.any {it["id"]?.jsonPrimitive?.int==eventId}}?.key ?: return
+        val types=eventTypes(eventId).associateBy {it.getValue("id").jsonPrimitive.int}
+        val changed=createdTicketTypes.getOrPut(owner) {mutableListOf()}
+        order["items"]?.jsonArray.orEmpty().forEach {item ->
+            val typeId=item.jsonObject.getValue("ticket_type_id").jsonPrimitive.int
+            val type=types[typeId] ?: return@forEach
+            val count=item.jsonObject.getValue("quantity").jsonPrimitive.int*(if(reserve) 1 else -1)
+            val updated=buildJsonObject {type.forEach {(k,v)->put(k,v)};put("sold_count",maxOf(0,type.getValue("sold_count").jsonPrimitive.int+count))}
+            changed.removeAll {it["id"]?.jsonPrimitive?.int==typeId};changed.add(updated)
+        }
+    }
     var nextEventId = 500
     val organizerReads = mutableMapOf<String, Int>()
     val myEventReads = mutableMapOf<String, Int>()
@@ -58,6 +95,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
     val accessAliases = mutableMapOf<String, String>()
     val refreshOwners = mutableMapOf(
         "mock-refresh-token" to "Bearer mock-access-token",
+        "mock-attendee-refresh-token" to "Bearer mock-attendee-access-token",
         "mock-empty-refresh-token" to "Bearer mock-empty-access-token",
         "mock-history-offline-refresh-token" to "Bearer mock-history-offline-token",
     )
@@ -68,6 +106,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
     fun isBuyer(owner: String?): Boolean = owner in refreshOwners.values ||
         owner?.removePrefix("Bearer mock-user-")?.toIntOrNull()?.let { it in registeredUsers.values.indices } == true
     fun buyerEmail(owner: String?): String = when (owner) {
+        "Bearer mock-attendee-access-token" -> "attendee@biletflow.kz"
         "Bearer mock-access-token" -> "visitor@biletflow.kz"
         "Bearer mock-empty-access-token" -> "empty@biletflow.kz"
         "Bearer mock-history-offline-token" -> "history-offline@biletflow.kz"
@@ -82,7 +121,6 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
     val campaignMutex = Mutex()
     var nextCampaignId = 12000
     val campaigns = mutableMapOf<Int,JsonObject>()
-    val campaignKeys = mutableMapOf<Triple<String,Int,String>,Pair<CampaignCreate,JsonObject>>()
     var event104TicketAttempts = 0
     val mockOrders = mutableMapOf<Int, String>()
     val paymentAttempts = mutableMapOf<Int, Int>()
@@ -112,26 +150,13 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
             put("ticket_type_name", type?.get("name") ?: JsonPrimitive("Ticket"))
         }
     }
-    fun ownedEvents(owner: String): List<JsonObject> {
-        val created = createdEvents[owner].orEmpty()
-        val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
-        if (owner != "Bearer mock-access-token" || profile == null) return created
-        val seeded = listOf("draft" to "private", "published" to "public", "cancelled" to "unlisted").mapIndexedNotNull { index, pair ->
-            val base = mockEvents[index].jsonObject
-            if (created.any { it["id"] == base["id"] }) null
-            else buildJsonObject {
-                base.forEach { (key, value) -> put(key, value) }
-                put("organizer_id", profile.getValue("id")); put("status", pair.first); put("visibility", pair.second)
-            }
-        }
-        return created + seeded
-    }
+    fun ownedEvents(owner: String): List<JsonObject> = if(organizerProfiles[owner]==null) emptyList() else createdEvents[owner].orEmpty()
     fun ownsSupportEvent(owner: String, eventId: Int): Boolean = organizerProfiles.containsKey(owner) && ownedEvents(owner).any { it["id"]?.jsonPrimitive?.int == eventId }
     var nextSupportMessageId = 100000
     var supportClock = 0
     /** Monotonic mock timestamps for support messages and case updates. */
     fun supportNow(): String { val s = supportClock++; return "2026-11-25T13:${(s / 60 % 60).toString().padStart(2,'0')}:${(s % 60).toString().padStart(2,'0')}+05:00" }
-    fun mockUserId(owner: String): Int = when(owner) { "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> 1000 + owner.removePrefix("Bearer mock-user-").toInt() }
+    fun mockUserId(owner: String): Int = when(owner) { "Bearer mock-attendee-access-token" -> 103; "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> 1000 + owner.removePrefix("Bearer mock-user-").toInt() }
     /** backend support_service._is_handler: platform admin, or the event owner for attendee cases. */
     fun supportHandles(owner: String, item: JsonObject): Boolean = isBuyer(owner) && buyerEmail(owner) == "admin@biletflow.kz" ||
         item["kind"]?.jsonPrimitive?.content == "attendee" && ownsSupportEvent(owner, item["event_id"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1)
@@ -175,14 +200,14 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
         eventId = 101,
         buyerName = "Mock Visitor",
         items = listOf(1001 to 1),
-        createdAt = "2026-11-12T18:00:00+05:00",
+        createdAt = "2026-11-20T18:00:00+05:00",
     )
     mockOrders[7102] = mockOrderResponse(
         orderId = 7102,
         eventId = 101,
         buyerName = "Mock Visitor",
         items = listOf(1002 to 1),
-        createdAt = "2026-11-11T12:00:00+05:00",
+        createdAt = "2026-11-20T12:00:00+05:00",
     )
     mockOrders[7103] = mockOrderResponse(
         orderId = 7103,
@@ -191,6 +216,9 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
         items = listOf(2002 to 1),
         createdAt = "2026-11-13T10:00:00+05:00",
     )
+    // Historical 101 orders were created while it was published, then the event was unpublished.
+    mockOrders[7110]=mockOrderResponse(7110,102,"Seed attendee",listOf(2001 to 1),createdAt="2026-11-20T10:00:00+05:00",buyerEmail="attendee@biletflow.kz")
+    orderOwners[7110]="Bearer mock-attendee-access-token"
     return HttpClient(MockEngine { request ->
         val path = request.url.encodedPath
         val rawAuthorization = request.headers[HttpHeaders.Authorization]
@@ -201,7 +229,8 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 path == "/orders/me" && email == "suspend-on-orders@biletflow.kz" ||
                 path.endsWith("/ticket-types/manage") && email == "suspend-on-manage@biletflow.kz" ||
                 path.matches(Regex("/events/\\d+/orders")) && email == "suspend-on-event-orders@biletflow.kz" ||
-                path.startsWith("/support/cases") && email == "suspend-on-cases@biletflow.kz") suspendedOwners.add(authorizationHeader.orEmpty())
+                path.startsWith("/support/cases") && email == "suspend-on-cases@biletflow.kz" ||
+                path.endsWith("/campaigns") && email=="suspend-on-campaigns@biletflow.kz") suspendedOwners.add(authorizationHeader.orEmpty())
             if(authorizationHeader in suspendedOwners && (!path.startsWith("/auth/") || path == "/auth/me"))
                 return@MockEngine respondJson("""{"error":"UserSuspendedError","message":"Account suspended","fields":null}""",HttpStatusCode.Forbidden)
         }
@@ -228,7 +257,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 val order=mockOrders[orderId]?.let {Json.parseToJsonElement(it).jsonObject}
                 val eventId=eventInput ?: order?.get("event_id")?.jsonPrimitive?.int
                 val event=createdEvents.values.flatten().firstOrNull {it["id"]?.jsonPrimitive?.int==eventId}
-                    ?: mockEvents.firstOrNull {it.jsonObject["id"]?.jsonPrimitive?.int==eventId}?.jsonObject
+                    ?: eventById(eventId ?: -1)
                 when {
                     !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
                     errors.isNotEmpty() -> respondJson(buildJsonObject {
@@ -241,7 +270,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                     kind=="attendee" && eventInput!=null && (event==null || event["status"]?.jsonPrimitive?.content!="published" || event["visibility"]?.jsonPrimitive?.content=="private") -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
                     else -> {
                         val id=nextSupportCaseId++
-                        val userId=when(owner) {"Bearer mock-access-token"->100;"Bearer mock-empty-access-token"->101;"Bearer mock-history-offline-token"->102;else->1000+owner.removePrefix("Bearer mock-user-").toInt()}
+                        val userId=when(owner) { "Bearer mock-attendee-access-token" -> 103;"Bearer mock-access-token"->100;"Bearer mock-empty-access-token"->101;"Bearer mock-history-offline-token"->102;else->1000+owner.removePrefix("Bearer mock-user-").toInt()}
                         val result=buildJsonObject {
                             put("id",id);put("kind",kind);put("category",category);put("subject",subject);put("status","open");put("requester_user_id",userId)
                             put("event_id",eventId?.let(::JsonPrimitive) ?: JsonNull);put("order_id",orderId?.let(::JsonPrimitive) ?: JsonNull)
@@ -283,7 +312,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 val owner=authorizationHeader.orEmpty()
                 val id=path.split('/')[3].toInt();val item=supportCases[id]
                 val input=runCatching {Json.parseToJsonElement((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()).jsonObject}.getOrNull()
-                val body=(input?.get("body") as? JsonPrimitive)?.takeIf {it.isString}?.content?.trim()
+                val body=(input?.get("body") as? JsonPrimitive)?.takeIf {it.isString}?.content?.let {com.example.biletflow.presentation.support.supportTrim(it)}
                 when {
                     !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
                     // FastAPI validates the body before the service runs, so 422 comes before 404
@@ -334,7 +363,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                     val reads=meReads.getOrElse(owner) { 0 }; meReads[owner]=reads+1
                     if(email == "me-offline@biletflow.kz" && reads == 0) throw IOException("Mock current user network unavailable")
                     else {
-                        val userId=when(owner) { "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> 1000+owner.removePrefix("Bearer mock-user-").toInt() }
+                        val userId=when(owner) { "Bearer mock-attendee-access-token" -> 103; "Bearer mock-access-token" -> 100; "Bearer mock-empty-access-token" -> 101; "Bearer mock-history-offline-token" -> 102; else -> 1000+owner.removePrefix("Bearer mock-user-").toInt() }
                         var profile=organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
                         if(profile != null && profile["status"]?.jsonPrimitive?.content == "pending") {
                             val reloads=organizerReads.getOrElse(owner) { 0 }+1; organizerReads[owner]=reloads
@@ -353,53 +382,44 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                     }
                 }
             }
-            path.matches(Regex("/organizer/events/\\d+/campaigns")) && request.method in listOf(HttpMethod.Get,HttpMethod.Post) -> campaignMutex.withLock {
-                val owner=authorizationHeader.orEmpty()
-                val eventId=path.split('/')[3].toInt()
-                val exists=mockEvents.any { it.jsonObject["id"]?.jsonPrimitive?.int == eventId } || createdEvents.values.flatten().any { it["id"]?.jsonPrimitive?.int == eventId }
+            path.matches(Regex("/events/\\d+/campaigns")) && request.method in listOf(HttpMethod.Get,HttpMethod.Post) -> campaignMutex.withLock {
+                val owner=authorizationHeader.orEmpty();val eventId=path.split('/')[2].toInt()
+                val profile=organizerProfiles[owner]?.let {Json.parseToJsonElement(it).jsonObject}
                 when {
                     !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
-                    !exists -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                    !ownsSupportEvent(owner,eventId) -> respondJson("""{"error":"EventAccessDeniedError","message":"Not event owner"}""",HttpStatusCode.Forbidden)
-                    request.method == HttpMethod.Get -> {
-                        val rawLimit=request.url.parameters["limit"]
-                        val limit=rawLimit?.toIntOrNull() ?: if(rawLimit == null) 50 else 0
-                        val cursor=request.url.parameters["cursor"]
-                        val prefix="campaigns-$eventId-before-"
-                        val before=cursor?.removePrefix(prefix)?.toIntOrNull()?.takeIf { cursor.startsWith(prefix) }
-                        val all=campaigns.values.filter { it["event_id"]?.jsonPrimitive?.int == eventId }.sortedByDescending { it.getValue("id").jsonPrimitive.int }
-                        if(limit !in 1..100 || cursor != null && (before == null || all.none { it["id"]?.jsonPrimitive?.int == before }))
-                            respondJson("""{"error":"VALIDATION_ERROR","message":"Invalid pagination","fields":{"cursor":"Invalid cursor or limit"}}""",HttpStatusCode.UnprocessableEntity)
-                        else {
-                            val remaining=all.filter { before == null || it.getValue("id").jsonPrimitive.int < before }
-                            val page=remaining.take(limit)
-                            respondJson(buildJsonObject { put("items",JsonArray(page)); put("next_cursor",if(remaining.size > limit) JsonPrimitive(prefix+page.last().getValue("id").jsonPrimitive.int) else JsonNull) }.toString(),HttpStatusCode.OK)
-                        }
-                    }
+                    profile==null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found"}""",HttpStatusCode.NotFound)
+                    profile["status"]?.jsonPrimitive?.content!="approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Not approved"}""",HttpStatusCode.Forbidden)
+                    eventById(eventId)==null -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                    !ownsSupportEvent(owner,eventId) -> respondJson("""{"error":"EventAccessDeniedError","message":"Not owner"}""",HttpStatusCode.Forbidden)
+                    request.method==HttpMethod.Get -> respondJson(JsonArray(campaigns.values.filter {it["event_id"]?.jsonPrimitive?.int==eventId}.sortedByDescending {it.getValue("id").jsonPrimitive.int}).toString(),HttpStatusCode.OK)
                     else -> {
-                        val parsed=runCatching { Json.decodeFromString<CampaignCreate>((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString()) }.getOrNull()
-                        val input=parsed?.copy(name=parsed.name.trim(),code=parsed.code.trim().uppercase(),startsAt=parsed.startsAt.trim(),endsAt=parsed.endsAt.trim(),ticketTypeIds=parsed.ticketTypeIds.sorted())
-                        val saved=input?.let { campaignKeys[Triple(owner,eventId,it.clientRequestId)] }
-                        val base=when(eventId) { 101 -> MOCK_EVENT_101_TICKET_TYPES_JSON; 102 -> MOCK_EVENT_102_TICKET_TYPES_JSON; else -> "[]" }
-                        val allowed=(Json.parseToJsonElement(base).jsonArray.map { it.jsonObject }+createdTicketTypes[owner].orEmpty()).filter { it["event_id"]?.jsonPrimitive?.int == eventId }.map { it.getValue("id").jsonPrimitive.int }.toSet()
-                        val errors=input?.let { validateCampaign(it) + if(it.ticketTypeIds.any { id -> id !in allowed }) setOf("ticket_type_ids") else emptySet() } ?: setOf("body")
+                        val input=runCatching {Json.decodeFromString<CampaignCreate>((request.body as OutgoingContent.ByteArrayContent).bytes().decodeToString())}.getOrNull()
+                        val errors=input?.let(::validateCampaign) ?: setOf("body")
+                        val types=eventTypes(eventId).associateBy {it.getValue("id").jsonPrimitive.int}
+                        val code=input?.code?.uppercase() ?: buildString {
+                            val alphabet="ABCDEFGHJKMNPQRSTUVWXYZ23456789";var value=nextCampaignId
+                            repeat(8) {append(alphabet[value%alphabet.length]);value/=alphabet.length}
+                        }
                         when {
-                            input == null || errors.isNotEmpty() -> respondJson(buildJsonObject { put("error","VALIDATION_ERROR"); put("message","Validation failed"); put("fields",buildJsonObject { errors.forEach { put(it,"Invalid value") } }) }.toString(),HttpStatusCode.UnprocessableEntity)
-                            saved != null && saved.first != input -> respondJson("""{"error":"ClientRequestConflictError","message":"Request ID used with another body"}""",HttpStatusCode.Conflict)
-                            saved != null -> respondJson(saved.second.toString(),HttpStatusCode.Created)
-                            campaigns.values.any { it["code"]?.jsonPrimitive?.content == input.code } -> respondJson("""{"error":"CampaignCodeAlreadyExistsError","message":"Code is already used","fields":{"code":"Already used"}}""",HttpStatusCode.Conflict)
-                            input.name == "campaign-offline" -> throw IOException("Mock campaign unavailable")
+                            eventById(eventId)?.get("status")?.jsonPrimitive?.content=="cancelled" -> respondJson("""{"error":"InvalidEventStatusError","message":"Event cancelled"}""",HttpStatusCode.Conflict)
+                            input==null || errors.isNotEmpty() -> respondJson(buildJsonObject {put("error","VALIDATION_ERROR");put("message","Invalid campaign");put("fields",buildJsonObject {errors.forEach {put(it,"Invalid value")}})}.toString(),HttpStatusCode.UnprocessableEntity)
+                            input.ticketTypeIds.any {id -> types[id]==null || types[id]?.get("price")?.jsonPrimitive?.int==0} -> respondJson("""{"error":"InvalidCampaignError","message":"Choose paid types of this event","fields":null}""",HttpStatusCode.BadRequest)
+                            campaigns.values.any {it["event_id"]?.jsonPrimitive?.int==eventId && it["code"]?.jsonPrimitive?.content==code} -> respondJson("""{"error":"PromoCodeAlreadyExistsError","message":"Code already used at this event","fields":{"code":"Already used"}}""",HttpStatusCode.Conflict)
+                            input.name=="campaign-offline" -> throw IOException("Mock campaign unavailable")
                             else -> {
+                                val id=nextCampaignId++
                                 val result=buildJsonObject {
-                                    put("id",nextCampaignId++); put("event_id",eventId); put("name",input.name); put("code",input.code)
-                                    put("discount_type",input.discountType); put("discount_value",input.discountValue)
-                                    put("starts_at",input.startsAt); put("ends_at",input.endsAt); put("usage_limit",input.usageLimit?.let(::JsonPrimitive) ?: JsonNull)
-                                    put("ticket_type_ids",JsonArray(input.ticketTypeIds.map(::JsonPrimitive)))
-                                    put("client_request_id",input.clientRequestId); put("created_at","2026-11-25T12:00:00+05:00")
+                                    put("id",id);put("event_id",eventId);put("name",input.name);put("code",code)
+                                    put("discount_type",input.discountType);put("discount_value",input.discountValue)
+                                    put("starts_at",input.startsAt?.let(::JsonPrimitive) ?: JsonNull);put("ends_at",input.endsAt?.let(::JsonPrimitive) ?: JsonNull)
+                                    put("max_redemptions",input.maxRedemptions?.let(::JsonPrimitive) ?: JsonNull)
+                                    put("ticket_type_ids",JsonArray(input.ticketTypeIds.distinct().map(::JsonPrimitive)))
+                                    put("redemptions_count",0);put("is_active",true);put("link","http://localhost:5173/events/$eventId?campaign=mock-token-$id");put("link_opens",0)
+                                    put("created_at","2026-11-25T12:00:00+05:00")
+                                    put("stats",buildJsonObject {listOf("orders","tickets","gross","discount","net").forEach {put(it,0)}})
                                 }
-                                campaigns[result.getValue("id").jsonPrimitive.int]=result
-                                campaignKeys[Triple(owner,eventId,input.clientRequestId)]=input to result
-                                if(input.name == "campaign-unknown") throw IOException("Mock campaign response lost after creation")
+                                campaigns[id]=result
+                                if(input.name=="campaign-unknown") throw IOException("Campaign saved; response lost")
                                 respondJson(result.toString(),HttpStatusCode.Created)
                             }
                         }
@@ -410,7 +430,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 val owner = authorizationHeader.orEmpty()
                 val eventId = path.split('/')[2].toInt()
                 val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
-                val exists = mockEvents.any { it.jsonObject["id"]?.jsonPrimitive?.int == eventId } ||
+                val exists = allEvents().any { it["id"]?.jsonPrimitive?.int == eventId } ||
                     createdEvents.values.flatten().any { it["id"]?.jsonPrimitive?.int == eventId }
                 val limit = request.url.parameters["limit"]?.toIntOrNull() ?: if(request.url.parameters["limit"] == null) 50 else 0
                 val offset = request.url.parameters["offset"]?.toIntOrNull() ?: if(request.url.parameters["offset"] == null) 0 else -1
@@ -449,7 +469,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 val owner = authorizationHeader.orEmpty()
                 val eventId = path.split('/')[2].toInt()
                 val profile = organizerProfiles[owner]?.let { Json.parseToJsonElement(it).jsonObject }
-                val exists = mockEvents.any { it.jsonObject["id"]?.jsonPrimitive?.int == eventId } ||
+                val exists = allEvents().any { it["id"]?.jsonPrimitive?.int == eventId } ||
                     createdEvents.values.flatten().any { it["id"]?.jsonPrimitive?.int == eventId }
                 val stored = createdTicketTypes[owner].orEmpty().filter { it["event_id"]?.jsonPrimitive?.int == eventId }
                 val seeded = if(owner == "Bearer mock-access-token") when(eventId) {
@@ -501,6 +521,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                                         add(buildJsonObject { ticket.jsonObject.forEach { (k, v) -> put(k, v) }; put("status", "refunded") })
                                     } }
                                 }
+                                changeInventory(order,false)
                                 mockOrders[orderId] = refunded.toString()
                                 if (reason == "refund-unknown" && attempt == 1) throw IOException("Mock refund response lost after processing")
                                 respondJson(refunded.toString(), HttpStatusCode.OK)
@@ -938,7 +959,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 when {
                     original == null -> respondJson("""{"error":"EventAccessDeniedError","message":"Access denied","fields":null}""",HttpStatusCode.Forbidden)
                     (if(cancel) original["status"]?.jsonPrimitive?.content !in listOf("draft","published") else original["status"]?.jsonPrimitive?.content != (if (publish) "draft" else "published")) -> respondJson("""{"error":"InvalidEventStatusError","message":"Event status changed","fields":null}""",HttpStatusCode.Conflict)
-                    publish && (original["venue_name"]?.jsonPrimitive?.content.isNullOrBlank() || original["venue_address"]?.jsonPrimitive?.content.isNullOrBlank()) -> respondJson("""{"error":"EventNotReadyToPublishError","message":"Venue and address are required","fields":{"venue_name":"required","venue_address":"required"}}""",HttpStatusCode.BadRequest)
+                    publish && (original["venue_name"]==null || original["venue_name"]==JsonNull || original["venue_address"]==null || original["venue_address"]==JsonNull) -> respondJson("""{"error":"EventNotReadyToPublishError","message":"Venue and address are required","fields":{"venue_name":"required","venue_address":"required"}}""",HttpStatusCode.BadRequest)
                     else -> {
                         val updated = buildJsonObject {
                             original.forEach { (k,v) -> put(k,v) }
@@ -949,7 +970,8 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                         if(cancel) mockOrders.toMap().forEach { (orderId,json) ->
                             val order = Json.parseToJsonElement(json).jsonObject
                             if(order["event_id"]?.jsonPrimitive?.int == id && order["status"]?.jsonPrimitive?.content in listOf("pending","confirmed")) {
-                                val refunded = order["paid_at"] != null && order["paid_at"] != JsonNull
+                                val refunded = order["status"]?.jsonPrimitive?.content=="confirmed" && order["total_amount"]!!.jsonPrimitive.long>0
+                                changeInventory(order,false)
                                 mockOrders[orderId] = buildJsonObject {
                                     order.forEach { (k,v) -> put(k,v) }
                                     put("status",if(refunded) "refunded" else "cancelled")
@@ -1067,7 +1089,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                             "Bearer mock-history-offline-token" -> 102
                             else -> 1000 + (owner.removePrefix("Bearer mock-user-").toIntOrNull() ?: 0)
                         }
-                        val profile = """{"id":${31 + organizerProfiles.size},"user_id":$userId,"status":"pending"}"""
+                        val profile = """{"id":${if(owner=="Bearer mock-access-token") 31 else 32 + organizerProfiles.size},"user_id":$userId,"status":"pending"}"""
                         organizerProfiles[owner] = profile
                         organizerReads[owner] = 0
                         respondJson(profile, HttpStatusCode.OK)
@@ -1121,7 +1143,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 val password = payload["password"]?.jsonPrimitive?.content.orEmpty()
                 when {
                     email == "register-offline@biletflow.kz" -> throw IOException("Mock registration unavailable")
-                    email in registeredUsers || email in setOf("visitor@biletflow.kz", "empty@biletflow.kz", "history-offline@biletflow.kz") ->
+                    email in registeredUsers || email in setOf("visitor@biletflow.kz", "empty@biletflow.kz", "history-offline@biletflow.kz", "attendee@biletflow.kz") ->
                         respondJson("""{"error":"UserAlreadyExistsError","message":"User already exists","fields":null}""", HttpStatusCode.Conflict)
                     password.length < 6 || !email.contains('@') ->
                         respondJson(MOCK_ORDER_VALIDATION_JSON, HttpStatusCode.UnprocessableEntity)
@@ -1151,6 +1173,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                     )
                     email == "suspended@biletflow.kz" && password == "password123" -> respondJson("""{"error":"UserSuspendedError","message":"Account suspended","fields":null}""",HttpStatusCode.Forbidden)
                     email == "offline@biletflow.kz" -> throw IOException("Mock network unavailable")
+                                        email == "attendee@biletflow.kz" && password == "password123" -> respondJson("""{"access_token":"mock-attendee-access-token","refresh_token":"mock-attendee-refresh-token","token_type":"bearer"}""",HttpStatusCode.OK)
                     email == "visitor@biletflow.kz" && password == "password123" ->
                         respondJson(MOCK_LOGIN_SUCCESS_JSON, HttpStatusCode.OK)
                     email == "empty@biletflow.kz" && password == "password123" ->
@@ -1182,7 +1205,16 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                         createdTicketTypes.values.flatten().associate { it["id"]!!.jsonPrimitive.int to it["price"]!!.jsonPrimitive.int }
                     val eventOwner = createdEvents.entries.firstOrNull { (_, events) -> events.any { it["id"]?.jsonPrimitive?.int == eventId } }?.key
                         ?: "Bearer mock-access-token"
+                    val event=eventById(eventId)
+                    val types=eventTypes(eventId).associateBy {it.getValue("id").jsonPrimitive.int}
+                    fun instant(key:String)=event?.get(key)?.takeIf {it!=JsonNull}?.jsonPrimitive?.content?.let {Instant.parse(it)}
                     when {
+                        !publicPage(event) -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                        (instant("registration_opens_at")?.let {now<it}==true || now>(instant("registration_closes_at") ?: instant("end_time")!!)) -> respondJson("""{"error":"RegistrationClosedError","message":"Registration is closed"}""",HttpStatusCode.Conflict)
+                        items.map {it.first}.distinct().size!=items.size || items.any {it.second<=0} -> respondJson("""{"error":"InvalidOrderQuantityError","message":"Invalid quantity"}""",HttpStatusCode.BadRequest)
+                        items.any { (id,_) -> val type=types[id]; type==null || type["is_hidden"]?.jsonPrimitive?.content=="true" || now<Instant.parse(type.getValue("sales_start").jsonPrimitive.content) || now>Instant.parse(type.getValue("sales_end").jsonPrimitive.content) } -> respondJson("""{"error":"TicketTypeNotAvailableError","message":"Ticket type unavailable"}""",HttpStatusCode.Conflict)
+                        items.any { (id,n) -> n>types.getValue(id).getValue("max_per_order").jsonPrimitive.int } -> respondJson("""{"error":"InvalidOrderQuantityError","message":"Order limit exceeded"}""",HttpStatusCode.BadRequest)
+                        items.any { (id,n) -> val t=types.getValue(id);n>t.getValue("quantity").jsonPrimitive.int-t.getValue("sold_count").jsonPrimitive.int } -> respondJson(MOCK_ORDER_CONFLICT_JSON,HttpStatusCode.Conflict)
                         buyerName.equals("offline", ignoreCase = true) ->
                             throw IOException("Mock connection interrupted after sending order")
                         buyerName.equals("conflict", ignoreCase = true) ->
@@ -1192,7 +1224,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                         items.any { (id, _) -> (ticketPrices[id] ?: 0) > 0 } && paidStatus(eventOwner, eventId)["status"]?.jsonPrimitive?.content != "active" ->
                             respondJson("""{"error":"PaidSalesNotActiveError","message":"Paid sales are not active","fields":null}""", HttpStatusCode.Conflict)
                         else -> {
-                            val orderId = when {
+                            val fixtureOrderId = when {
                                 authorization != "Bearer mock-access-token" || eventId >= 500 || items.any { it.first >= 3000 } -> nextCreatedOrderId++
                                 buyerName.equals("decline", ignoreCase = true) -> 7003
                                 buyerName.equals("expired", ignoreCase = true) -> 7004
@@ -1200,6 +1232,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                                 items.all { (id, _) -> id == 1002 || id == 2001 } -> 7001
                                 else -> 7002
                             }
+                            val orderId=if(mockOrders.containsKey(fixtureOrderId)) nextCreatedOrderId++ else fixtureOrderId
                             val orderJson = mockOrderResponse(
                                 orderId = orderId,
                                 eventId = path.removePrefix("/events/").substringBefore('/').toInt(),
@@ -1209,6 +1242,7 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                                 ticketPrices = ticketPrices,
                                 buyerEmail = buyerEmail(authorization),
                             )
+                            changeInventory(Json.parseToJsonElement(orderJson).jsonObject,true)
                             mockOrders[orderId] = orderJson
                             orderOwners[orderId] = requireNotNull(authorization)
                             respondJson(orderJson, HttpStatusCode.Created)
@@ -1230,6 +1264,8 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                     when {
                         !validEmptyObject -> respondJson(MOCK_ORDER_VALIDATION_JSON, HttpStatusCode.UnprocessableEntity)
                         orderJson == null -> respondJson(MOCK_ORDER_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                        Json.parseToJsonElement(orderJson).jsonObject["status"]?.jsonPrimitive?.content!="pending" -> respondJson("""{"error":"OrderNotPayableError","message":"Order no longer pending"}""",HttpStatusCode.Conflict)
+                        eventById(Json.parseToJsonElement(orderJson).jsonObject.getValue("event_id").jsonPrimitive.int)?.get("suspended_at")?.let {it!=JsonNull}==true -> respondJson("""{"error":"OrderNotPayableError","message":"Event suspended"}""",HttpStatusCode.Conflict)
                         orderId == 7004 -> respondJson(MOCK_ORDER_EXPIRED_JSON, HttpStatusCode.Conflict)
                         orderId == 7003 && paymentAttempts.getOrElse(orderId) { 0 } == 0 -> {
                             paymentAttempts[orderId] = 1
@@ -1273,12 +1309,14 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                             !cancellable -> respondJson(MOCK_ORDER_NOT_CANCELLABLE_JSON, HttpStatusCode.Conflict)
                             orderId == 7103 && cancellationAttempts.getOrElse(orderId) { 0 } == 0 -> {
                                 cancellationAttempts[orderId] = 1
+                                changeInventory(order,false)
                                 mockOrders[orderId] = mockCancelledOrderResponse(orderJson)
                                 throw IOException("Mock connection interrupted after cancellation was processed")
                             }
                             else -> {
                                 cancellationAttempts[orderId] = cancellationAttempts.getOrElse(orderId) { 0 } + 1
                                 val cancelled = mockCancelledOrderResponse(orderJson)
+                                changeInventory(order,false)
                                 mockOrders[orderId] = cancelled
                                 respondJson(cancelled, HttpStatusCode.OK)
                             }
@@ -1326,15 +1364,15 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 }
             }
             request.method == HttpMethod.Get && (path == "/events" || path == "/events/categories") -> {
-                val all=catalogPublic(createdEvents.values.flatten())
-                val now=Instant.parse("2026-11-25T00:00:00Z") // Deterministic mock clock for the existing fixtures.
-                val upcoming=all.filter { Instant.parse(it.getValue("end_time").jsonPrimitive.content) > now }
-                if(path.endsWith("/categories")) respondJson(JsonArray(upcoming.mapNotNull { (it["category"] as? JsonPrimitive)?.contentOrNull }.distinct().sorted().map(::JsonPrimitive)).toString(),HttpStatusCode.OK)
+                val all=catalogPublic()
+
+                val upcoming=all.filter { Instant.parse(it.getValue("end_time").jsonPrimitive.content) >= now }
+                if(path.endsWith("/categories")) respondJson(JsonArray(all.filter {Instant.parse(it.getValue("end_time").jsonPrimitive.content)>now}.mapNotNull { (it["category"] as? JsonPrimitive)?.contentOrNull }.distinct().sorted().map(::JsonPrimitive)).toString(),HttpStatusCode.OK)
                 else {
                     val p=request.url.parameters
                     val limit=p["limit"]?.toIntOrNull() ?: if(p["limit"]==null) 20 else 0
                     val offset=p["offset"]?.toIntOrNull() ?: if(p["offset"]==null) 0 else -1
-                    val q=p["q"].orEmpty(); val category=p["category"]
+                    val q=p["q"].orEmpty().trim(); val category=p["category"]?.trim()?.takeIf {it.isNotEmpty()}
                     val from=p["date_from"]?.let { runCatching { Instant.parse(it) }.getOrNull() }
                     val to=p["date_to"]?.let { runCatching { Instant.parse(it) }.getOrNull() }
                     if(limit !in 1..100 || offset < 0 || q.length > 100 || category.orEmpty().length > 100 || p["date_from"] != null && from == null || p["date_to"] != null && to == null)
@@ -1351,45 +1389,27 @@ fun createMockEventsHttpClient(visitorCheckoutReady: Boolean = false, catalogPag
                 }
             }
             request.method == HttpMethod.Get && path.matches(Regex("/events/\\d+/ticket-types")) -> {
-                val id = path.removePrefix("/events/").substringBefore('/').toInt()
-                val ownEvent = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == id }
-                val extra = createdTicketTypes.values.flatten().filter { it["event_id"]?.jsonPrimitive?.int == id }
-                if (ownEvent != null && ownEvent["status"]?.jsonPrimitive?.content != "published") {
-                    respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
-                } else if (extra.isNotEmpty()) {
-                    respondJson(buildJsonArray {
-                        val base = when(id) { 101 -> MOCK_EVENT_101_TICKET_TYPES_JSON; 102 -> MOCK_EVENT_102_TICKET_TYPES_JSON; else -> "[]" }
-                        Json.parseToJsonElement(base).jsonArray.filter { old -> extra.none { it["id"] == old.jsonObject["id"] } }.forEach { add(it) }
-                        extra.filter { it["is_hidden"]?.jsonPrimitive?.content == "false" }.forEach { add(it) }
-                    }.toString(),HttpStatusCode.OK)
-                } else
-                when (path.removePrefix("/events/").substringBefore('/').toInt()) {
-                    101 -> respondJson(MOCK_EVENT_101_TICKET_TYPES_JSON, HttpStatusCode.OK)
-                    102 -> respondJson(MOCK_EVENT_102_TICKET_TYPES_JSON, HttpStatusCode.OK)
-                    103 -> respondJson("[]", HttpStatusCode.OK)
-                    104 -> {
-                        event104TicketAttempts++
-                        if (event104TicketAttempts == 1) {
-                            respondJson(MOCK_TICKETS_ERROR_JSON, HttpStatusCode.InternalServerError)
-                        } else {
-                            respondJson("[]", HttpStatusCode.OK)
-                        }
-                    }
-                    else -> respondJson(MOCK_EVENT_NOT_FOUND_JSON, HttpStatusCode.NotFound)
+                val id=path.split('/')[2].toInt()
+                if(!publicPage(eventById(id))) respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                else if(id==104 && event104TicketAttempts++==0) respondJson(MOCK_TICKETS_ERROR_JSON,HttpStatusCode.InternalServerError)
+                else respondJson(JsonArray(eventTypes(id).filter {it["is_hidden"]?.jsonPrimitive?.content!="true"}).toString(),HttpStatusCode.OK)
+            }
+            request.method == HttpMethod.Get && path.matches(Regex("/events/\\d+/manage")) -> {
+                val owner=authorizationHeader.orEmpty();val id=path.split('/')[2].toInt()
+                val profile=organizerProfiles[owner]?.let {Json.parseToJsonElement(it).jsonObject}
+                when {
+                    !isBuyer(owner) -> respondJson(MOCK_ORDER_UNAUTHORIZED_JSON,HttpStatusCode.Unauthorized)
+                    profile==null -> respondJson("""{"error":"OrganizerNotFoundError","message":"Organizer not found"}""",HttpStatusCode.NotFound)
+                    profile["status"]?.jsonPrimitive?.content!="approved" -> respondJson("""{"error":"OrganizerNotApprovedError","message":"Not approved"}""",HttpStatusCode.Forbidden)
+                    eventById(id)==null -> respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
+                    ownedEvents(owner).none {it["id"]?.jsonPrimitive?.int==id} -> respondJson("""{"error":"EventAccessDeniedError","message":"Not owner"}""",HttpStatusCode.Forbidden)
+                    else -> respondJson(requireNotNull(eventById(id)).toString(),HttpStatusCode.OK)
                 }
             }
-            request.method == HttpMethod.Get && path.startsWith("/events/") -> {
-                val eventId = path.substringAfterLast('/').toIntOrNull()
-                val event = eventId?.let { id ->
-                    val changed = createdEvents.values.flatten().firstOrNull { it["id"]?.jsonPrimitive?.int == id }
-                    if (changed != null) changed.takeIf { it["status"]?.jsonPrimitive?.content == "published" && it["visibility"]?.jsonPrimitive?.content != "private" }
-                    else mockEvents.firstOrNull { item -> item.jsonObject["id"]?.jsonPrimitive?.int == id } ?: catalogExtra.firstOrNull { it["id"]?.jsonPrimitive?.int == id }
-                }
-                if (event != null) {
-                    respondJson(event.toString(), HttpStatusCode.OK)
-                } else {
-                    respondJson(MOCK_EVENT_NOT_FOUND_JSON, HttpStatusCode.NotFound)
-                }
+            request.method == HttpMethod.Get && path.matches(Regex("/events/\\d+")) -> {
+                val event=eventById(path.substringAfterLast('/').toInt())
+                if(publicPage(event)) respondJson(requireNotNull(event).toString(),HttpStatusCode.OK)
+                else respondJson(MOCK_EVENT_NOT_FOUND_JSON,HttpStatusCode.NotFound)
             }
             else -> error("Unexpected mock request: ${request.method.value} ${request.url}")
         }

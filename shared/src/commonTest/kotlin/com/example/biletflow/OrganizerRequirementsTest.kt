@@ -17,7 +17,7 @@ import kotlin.test.*
 class OrganizerRequirementsTest {
     @Test fun savesRequirementsAcrossEventsAndIsolatesAccounts() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         var verificationRequests = 0
         var accountRequests = 0
         var holdVerification: CompletableDeferred<Unit>? = null

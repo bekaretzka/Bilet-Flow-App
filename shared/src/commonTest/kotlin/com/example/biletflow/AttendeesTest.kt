@@ -20,7 +20,7 @@ import kotlin.test.*
 class AttendeesTest {
     @Test fun freeTicketsRetrySearchCancellationRefreshAndIsolation() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client = createMockEventsHttpClient()
+        val client = createMockEventsHttpClient(publishedFixtureEvents = true)
         val session = SessionStore().apply { save(AuthTokens("mock-access-token", "mock-refresh-token", "bearer")) }
         val orders = OrdersRepositoryImpl(client, "http://test")
         val requests = SessionOrdersRepository(orders, AuthRepositoryImpl(client, "http://test"), session, backgroundScope)
@@ -35,6 +35,7 @@ class AttendeesTest {
             assertTrue(vm.state.value.error)
             vm.reload(); vm.state.first { !it.loading }
             val initial = vm.state.value.attendees.size
+            prepareTicketFixture(client)
             val order = orders.createOrder(101, "Several Tickets", listOf(CreateOrderItem(1002, 2)), "mock-access-token")
             assertEquals("confirmed", order.status)
             vm.reload(); vm.state.first { !it.loading }

@@ -40,7 +40,7 @@ class SupportThreadTest {
     private fun isCaseGet(request:HttpRequestBuilder)=request.method==HttpMethod.Get && request.url.build().encodedPath.matches(Regex("/support/cases/\\d+"))
 
     @Test fun postSendsOnlyBodyAndPatchOnlyStatus()=runTest {
-        val client=createMockEventsHttpClient();val bodies=mutableListOf<Pair<HttpMethod,JsonObject>>()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val bodies=mutableListOf<Pair<HttpMethod,JsonObject>>()
         client.plugin(HttpSend).intercept {request ->
             if(isPost(request) || request.method==HttpMethod.Patch) bodies.add(request.method to bodyOf(request))
             execute(request)
@@ -61,7 +61,7 @@ class SupportThreadTest {
 
     @Test fun created201IsNotDuplicatedAndDraftClearsOnlyAfterConfirmation()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();val gate=CompletableDeferred<Unit>();var holdPost=false;var failGets=false;var posts=0
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);val gate=CompletableDeferred<Unit>();var holdPost=false;var failGets=false;var posts=0
         client.plugin(HttpSend).intercept {request ->
             if(isPost(request)) posts++
             if(failGets && isCaseGet(request)) throw IOException("read after send fails")
@@ -87,7 +87,7 @@ class SupportThreadTest {
 
     @Test fun serverErrorKeepsDraftAndNotFoundMarksCaseUnavailable()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();var forgeId:Int?=null
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);var forgeId:Int?=null
         client.plugin(HttpSend).intercept {request ->
             forgeId?.let {id -> if(isPost(request)) request.url.encodedPath="/support/cases/$id/messages"}
             execute(request)
@@ -107,7 +107,7 @@ class SupportThreadTest {
 
     @Test fun requesterReplyToResolvedCaseBecomesOpenAfterReread()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient()
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true)
         val w=world(client);w.store.save(w.attendee)
         val vm=SupportCasesViewModel(client,w.requests,w.store,"http://test")
         try {
@@ -128,7 +128,7 @@ class SupportThreadTest {
 
     @Test fun unknownSendNeverRepostsAndChecksForANewMessageOfMine()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();var mode="";var posts=0
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);var mode="";var posts=0
         client.plugin(HttpSend).intercept {request ->
             if(isPost(request)) {
                 posts++
@@ -161,9 +161,9 @@ class SupportThreadTest {
         } finally {vm.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
     }
 
-    @Test fun requesterNeverSeesStatusControlsEvenAsOrganizerAndForbiddenHidesThem()=runTest {
+    @Test fun ownerRequesterRetainsHandlerRightsAndForbiddenHidesThem()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();var patchAs:String?=null;var patches=0
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);var patchAs:String?=null;var patches=0
         client.plugin(HttpSend).intercept {request ->
             if(request.method==HttpMethod.Patch) {patches++;patchAs?.let {request.headers[HttpHeaders.Authorization]="Bearer $it"}}
             execute(request)
@@ -178,25 +178,25 @@ class SupportThreadTest {
             runCurrent();vm.select(attendeeCase.id);vm.state.first {it.detail!=null && !it.loading};assertFalse(vm.state.value.canManageStatus)
             w.store.save(w.organizer);runCurrent()
             vm.openEvent(101,"Event");vm.state.first {!it.loading};assertEquals(setOf(own.id,attendeeCase.id),vm.state.value.items.map {it.id}.toSet())
-            vm.select(own.id);vm.state.first {it.detail!=null && !it.loading};assertFalse(vm.state.value.canManageStatus)
-            vm.changeStatus("resolved");runCurrent();assertEquals(0,patches)
+            vm.select(own.id);vm.state.first {it.detail!=null && !it.loading};assertTrue(vm.state.value.canManageStatus)
+            vm.changeStatus("resolved");vm.state.first {!it.statusBusy};assertEquals(1,patches)
             vm.back();vm.state.first {!it.loading};vm.open();vm.state.first {!it.loading}
-            vm.select(attendeeCase.id);vm.state.first {it.detail!=null && !it.loading};assertFalse(vm.state.value.canManageStatus)
+            vm.select(attendeeCase.id);vm.state.first {it.detail!=null && !it.loading};assertTrue(vm.state.value.canManageStatus)
             vm.openEvent(101,"Event");vm.state.first {!it.loading};vm.select(attendeeCase.id);vm.state.first {it.detail!=null && !it.loading}
             assertTrue(vm.state.value.canManageStatus)
             vm.changeStatus("waiting_for_customer");vm.changeStatus("resolved");vm.state.first {!it.statusBusy}
-            assertEquals(1,patches);assertEquals("waiting_for_customer",vm.state.value.detail!!.status)
+            assertEquals(2,patches);assertEquals("waiting_for_customer",vm.state.value.detail!!.status)
             vm.changeStatus("resolved");vm.state.first {!it.statusBusy};assertEquals("resolved",vm.state.value.detail!!.status)
             // The server answers 403 SupportCaseAccessDeniedError: controls disappear and the case is re-read.
             patchAs=w.attendee.accessToken;vm.changeStatus("open");vm.state.first {!it.statusBusy};vm.state.first {!it.loading}
             assertTrue(vm.state.value.statusDenied);assertFalse(vm.state.value.canManageStatus);assertEquals("resolved",vm.state.value.detail!!.status)
-            assertEquals(3,patches)
+            assertEquals(4,patches)
         } finally {vm.viewModelScope.cancel();client.close();Dispatchers.resetMain()}
     }
 
     @Test fun unknownStatusResultIsNotRetriedAndShowsServerStatus()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();var lose=false;var patches=0
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);var lose=false;var patches=0
         client.plugin(HttpSend).intercept {request ->
             if(request.method==HttpMethod.Patch) {patches++;if(lose) {execute(request);throw IOException("status answer lost")}}
             execute(request)
@@ -224,7 +224,7 @@ class SupportThreadTest {
 
     @Test fun lateAnswersFromAnotherCaseAccountOrOlderReadAreIgnored()=runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val client=createMockEventsHttpClient();var gate=CompletableDeferred<Unit>();var holdPath:String?=null
+        val client=createMockEventsHttpClient(publishedFixtureEvents = true);var gate=CompletableDeferred<Unit>();var holdPath:String?=null
         client.plugin(HttpSend).intercept {request ->
             val path=request.url.build().encodedPath
             val held=holdPath==path && request.method==HttpMethod.Get
