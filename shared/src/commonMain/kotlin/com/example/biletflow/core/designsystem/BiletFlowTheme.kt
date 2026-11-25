@@ -161,3 +161,15 @@ fun TextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Bool
     colors: ButtonColors = ButtonDefaults.textButtonColors(contentColor = BF.primary),
     border: BorderStroke? = null, contentPadding: PaddingValues = ButtonDefaults.TextButtonContentPadding, content: @Composable RowScope.() -> Unit) =
     androidx.compose.material3.TextButton(onClick, modifier, enabled, shape, colors, null, border, contentPadding, content = content)
+
+// Figma cards: white, radius 16, 1 dp line/default border, no shadow.
+@Composable
+fun Card(modifier: Modifier = Modifier, shape: Shape = BF.radiusCard, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) =
+    androidx.compose.material3.Card(modifier, shape, androidx.compose.material3.CardDefaults.cardColors(containerColor = BF.surface, contentColor = BF.ink),
+        androidx.compose.material3.CardDefaults.cardElevation(0.dp), BorderStroke(1.dp, BF.line), content)
+
+@Composable
+fun Card(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape = BF.radiusCard,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) =
+    androidx.compose.material3.Card(onClick, modifier, enabled, shape, androidx.compose.material3.CardDefaults.cardColors(containerColor = BF.surface, contentColor = BF.ink),
+        androidx.compose.material3.CardDefaults.cardElevation(0.dp), BorderStroke(1.dp, BF.line), content = content)

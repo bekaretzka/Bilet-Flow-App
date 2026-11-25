@@ -284,7 +284,7 @@ fun PaidSalesPage(vm: PaidSalesViewModel) {
                     else -> Res.string.paid_sales_title
                 }))
                 if (data.status !in listOf("not_started", "pending", "active", "suspended")) Text(data.status)
-                if (data.isSimulated) Text(stringResource(Res.string.paid_simulated))
+                if (data.isSimulated) com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.paid_simulated))
                 Text("${stringResource(Res.string.paid_fee)}: ${data.feeAmount} ${data.currency}")
                 data.checklist.forEach { (key,complete) ->
                     val label = when(key) {

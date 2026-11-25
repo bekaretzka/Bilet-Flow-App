@@ -759,4 +759,9 @@
     <string name="support_history_nobody">никто</string>
     <string name="event_error_has_tickets">Билеты уже проданы: снять с публикации нельзя. Вместо этого отмените мероприятие.</string>
     <string name="event_error_ended">Мероприятие уже прошло, отменить его нельзя.</string>
+    <string name="payment_demo_banner">Демо-оплата: реальные деньги не списываются</string>
+    <string name="catalog_few_left">Мало мест</string>
+    <string name="ticket_card_type">Билет</string>
+    <string name="ticket_card_attendee">Участник</string>
+    <string name="ticket_card_hint">Покажите код на входе. Распечатанная и электронная копии — один и тот же билет.</string>
 </resources>

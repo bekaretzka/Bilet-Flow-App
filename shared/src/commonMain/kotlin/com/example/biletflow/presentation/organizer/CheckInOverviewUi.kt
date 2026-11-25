@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
 import androidx.compose.foundation.layout.*
@@ -278,13 +279,7 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
             state.undoResult?.let { ticket ->
                 Text(stringResource(if (ticket.status == "valid" && ticket.checkedInAt == null) Res.string.undo_success else Res.string.undo_server_result), style = MaterialTheme.typography.titleMedium)
                 Text("${ticket.attendeeName.orEmpty()} · #${ticket.id}")
-                Text(when (ticket.status) {
-                    "valid" -> stringResource(Res.string.attendees_valid)
-                    "checked_in" -> stringResource(Res.string.attendees_checked_in)
-                    "cancelled" -> stringResource(Res.string.attendees_cancelled)
-                    "refunded" -> stringResource(Res.string.attendees_refunded)
-                    else -> ticket.status
-                })
+                com.example.biletflow.core.designsystem.TicketStatusChip(ticket.status)
                 ticket.checkedInAt?.let { Text(formatEventDate(it)) }
             }
             if (state.undoAbsent) Text(stringResource(Res.string.undo_absent))
@@ -330,13 +325,7 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
                     Text("${stringResource(Res.string.attendees_ticket)} #${ticket.id}", style = MaterialTheme.typography.titleMedium)
                     ticket.attendeeName?.let { Text(it) }; ticket.ticketTypeName?.let { Text(it) }
                     Text(ticket.code)
-                    Text(when (ticket.status) {
-                        "valid" -> stringResource(Res.string.attendees_valid)
-                        "checked_in" -> stringResource(Res.string.attendees_checked_in)
-                        "cancelled" -> stringResource(Res.string.attendees_cancelled)
-                        "refunded" -> stringResource(Res.string.attendees_refunded)
-                        else -> ticket.status
-                    })
+                    com.example.biletflow.core.designsystem.TicketStatusChip(ticket.status)
                     ticket.checkedInAt?.let { Text(scannedText(it, ticket.checkedInBy)) }
                     Button(onClick = { vm.askCheckIn(ticket) }, enabled = !state.checkingIn && !state.searching && state.unknownCode == null) {
                         Text(stringResource(Res.string.check_action))

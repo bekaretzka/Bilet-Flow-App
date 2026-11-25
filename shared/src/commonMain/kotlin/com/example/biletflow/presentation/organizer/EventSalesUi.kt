@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
 import androidx.compose.foundation.layout.*
@@ -115,7 +116,7 @@ fun EventSalesPage(vm: EventSalesViewModel) {
             }
             else -> state.sales?.let { sales ->
                 val currency = if (sales.currency == "KZT") "₸" else sales.currency
-                if (sales.isSimulated) item { Text(stringResource(Res.string.sales_simulated)) }
+                if (sales.isSimulated) item { com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.sales_simulated)) }
                 val metrics = listOf(
                     Res.string.sales_paid_orders to sales.paidOrders.toString(),
                     Res.string.sales_gross to "${sales.grossSales} $currency",

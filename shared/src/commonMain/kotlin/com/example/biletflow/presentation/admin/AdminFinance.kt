@@ -36,7 +36,7 @@ private fun currency(value: String) = if (value == "KZT") "₸" else value
 @Composable
 private fun Small(text: String) = Text(text, style = MaterialTheme.typography.bodySmall)
 @Composable
-private fun Simulated(simulated: Boolean) { if (simulated) Text(stringResource(Res.string.sales_simulated), color = MaterialTheme.colorScheme.tertiary) }
+private fun Simulated(simulated: Boolean) { if (simulated) com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.sales_simulated)) }
 @Composable
 private fun Unreadable(row: JsonObject) = Text("#${row.id} ${stringResource(Res.string.admin_row_unreadable)}", color = MaterialTheme.colorScheme.error)
 

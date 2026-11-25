@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.OutlinedButton
 import com.example.biletflow.core.designsystem.Button

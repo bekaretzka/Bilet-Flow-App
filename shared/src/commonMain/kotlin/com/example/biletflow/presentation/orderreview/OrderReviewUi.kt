@@ -117,7 +117,7 @@ fun OrderReviewPage(
                     }
                     Button(
                         onClick = onLogin,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
                     ) {
@@ -205,7 +205,7 @@ fun OrderReviewPage(
                         },
                         enabled = requestItems.isNotEmpty() && !orderState.isSubmitting &&
                             orderState.error != OrderCreationError.UnknownResult,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
                     ) {

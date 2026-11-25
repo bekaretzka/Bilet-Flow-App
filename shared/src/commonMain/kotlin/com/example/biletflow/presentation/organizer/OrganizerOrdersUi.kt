@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
 import androidx.compose.foundation.layout.*
@@ -46,7 +47,7 @@ private fun OrderSummary(order: OrganizerOrder, details: Boolean = false) {
         Text("${stringResource(Res.string.organizer_order_refunded)}: ${it.amount} ₸ · ${it.providerReference}")
         it.reason?.let { reason -> Text(reason) }; Text(formatEventDate(it.createdAt))
     }
-    if(order.isSimulated) Text(stringResource(Res.string.organizer_refund_simulated))
+    if(order.isSimulated) com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.organizer_refund_simulated))
     }
 }
 
@@ -121,7 +122,7 @@ fun OrganizerOrdersPage(vm: OrganizerOrdersViewModel) {
             title = { Text(stringResource(Res.string.organizer_refund_action)) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("#${order.id} · ${order.totalAmount} ₸")
-                Text(stringResource(Res.string.organizer_refund_simulated))
+                com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.organizer_refund_simulated))
                 OutlinedTextField(state.reason, vm::reason, label = { Text(stringResource(Res.string.organizer_refund_reason)) },
                     isError = state.invalidReason, modifier = Modifier.fillMaxWidth())
                 if (state.invalidReason) Text(stringResource(Res.string.organizer_refund_reason_error), color = MaterialTheme.colorScheme.error)

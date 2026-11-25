@@ -196,38 +196,36 @@ private fun EventCard(event: Event, onClick: () -> Unit) {
     ) {
         Column {
             Box(
-                modifier = Modifier.fillMaxWidth().height(190.dp).background(Cover),
+                modifier = Modifier.fillMaxWidth().height(120.dp).background(Cover),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(stringResource(Res.string.event_cover_placeholder), color = Muted, fontSize = 16.sp)
                 event.imageUrl?.let { com.example.biletflow.presentation.documents.PublicImage(it, event.title, Modifier.fillMaxSize()) }
             }
-            Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                Tag(category)
-                Spacer(Modifier.height(10.dp))
-                Text(event.title, color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Medium, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
-                Spacer(Modifier.height(8.dp))
-                Text(formatEventDate(event.startTime), color = Muted, fontSize = 14.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(venue, color = Muted, fontSize = 14.sp)
-                event.minPrice?.let { price ->
-                    Spacer(Modifier.height(8.dp))
-                    Text(if (price == 0L) stringResource(Res.string.ticket_price_free)
-                        else stringResource(Res.string.catalog_price_from, price.toString().reversed().chunked(3).joinToString(" ").reversed()),
-                        color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 16.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Tag(category)
+                    event.ticketsRemaining?.let { left ->
+                        // «Мало мест» / sold out tag as in Figma «Зритель / Каталог событий»
+                        if (left == 0) com.example.biletflow.core.designsystem.Tag(stringResource(Res.string.catalog_sold_out), com.example.biletflow.core.designsystem.Tone.Danger)
+                        else if (left <= FEW_SEATS) com.example.biletflow.core.designsystem.Tag(stringResource(Res.string.catalog_few_left), com.example.biletflow.core.designsystem.Tone.Danger)
+                    }
                 }
-                event.ticketsRemaining?.let { left ->
-                    Text(if (left == 0) stringResource(Res.string.catalog_sold_out) else stringResource(Res.string.catalog_tickets_left, left),
-                        color = if (left == 0) com.example.biletflow.core.designsystem.BF.dangerFg else Muted, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                                Text(event.title, color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
+                Spacer(Modifier.height(8.dp))
+                Text(formatEventDate(event.startTime), color = com.example.biletflow.core.designsystem.BF.ink2, fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Text(venue, color = Muted, fontSize = 13.sp)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(when (val price = event.minPrice) {
+                        null -> ""
+                        0L -> stringResource(Res.string.ticket_price_free)
+                        else -> stringResource(Res.string.catalog_price_from, price.toString().reversed().chunked(3).joinToString(" ").reversed())
+                    }, color = Ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("${stringResource(Res.string.event_more)} →", color = Purple, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "${stringResource(Res.string.event_more)} →",
-                    color = Purple,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.align(Alignment.End),
-                )
             }
         }
     }
@@ -241,7 +239,7 @@ private fun Tag(text: String) {
             color = Muted,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
 }
@@ -275,3 +273,4 @@ private fun EventCatalogPreview() {
         )
     }
 }
+private const val FEW_SEATS = 10

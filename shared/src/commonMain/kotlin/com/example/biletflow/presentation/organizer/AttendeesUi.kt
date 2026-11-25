@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
 import androidx.compose.foundation.layout.*
@@ -130,13 +131,7 @@ fun AttendeesPage(vm: AttendeesViewModel) {
                             attendee.attendeeName?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
                             attendee.buyerEmail?.let { Text(it) }
                             attendee.ticketTypeName?.let { Text(it) }
-                            Text(stringResource(when (attendee.status) {
-                                "valid" -> Res.string.attendees_valid
-                                "checked_in" -> Res.string.attendees_checked_in
-                                "cancelled" -> Res.string.attendees_cancelled
-                                "refunded" -> Res.string.attendees_refunded
-                                else -> Res.string.ticket_unavailable
-                            }))
+                            com.example.biletflow.core.designsystem.TicketStatusChip(attendee.status)
                             Text("${stringResource(Res.string.attendees_ticket)} #${attendee.ticketId} · ${stringResource(Res.string.attendees_order)} #${attendee.orderId}")
                             Text("${stringResource(Res.string.attendees_created)}: ${formatEventDate(attendee.createdAt)}")
                             attendee.checkedInAt?.let { Text(scannedText(it, attendee.checkedInBy)) }

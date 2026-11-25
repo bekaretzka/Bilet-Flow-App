@@ -123,6 +123,7 @@ fun OrderResultPage(
             }
             if (pending || orderCanBeCancelled(order)) {
                 Spacer(Modifier.height(18.dp))
+                if (pending) { com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.payment_demo_banner)); Spacer(Modifier.height(12.dp)) }
                 PaymentErrorMessage(paymentState.error, expired)
                 if (!pending && paymentState.error == PaymentError.Unauthorized) {
                     ResultActionButton(
@@ -168,7 +169,7 @@ fun OrderResultPage(
                     Button(
                         onClick = { showCancelDialog = true },
                         enabled = !busy,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = com.example.biletflow.core.designsystem.BF.dangerFg,
@@ -218,7 +219,7 @@ fun OrderResultPage(
         Spacer(Modifier.height(12.dp))
         Button(
             onClick = onDone,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
         ) {
@@ -317,7 +318,7 @@ private fun ResultActionButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(52.dp),
+        modifier = Modifier.fillMaxWidth().height(48.dp),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
     ) {

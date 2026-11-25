@@ -1,5 +1,6 @@
 package com.example.biletflow.presentation.organizer
 
+import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
 import androidx.compose.foundation.background
@@ -156,7 +157,7 @@ fun EventInsightsPage(vm: EventInsightsViewModel) {
         } else state.analytics?.let { a ->
             val cur = if (a.currency == "KZT") "₸" else a.currency
             item {
-                if (a.isSimulated) Text(stringResource(Res.string.sales_simulated))
+                if (a.isSimulated) com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.sales_simulated))
                 Text(stringResource(Res.string.analytics_capacity), style = MaterialTheme.typography.titleMedium)
                 Text("${stringResource(Res.string.create_capacity)}: ${a.capacity.capacity ?: "—"} · ${stringResource(Res.string.sales_sold)}: ${a.capacity.sold} · ${stringResource(Res.string.sales_reserved)}: ${a.capacity.held}")
                 Text("${stringResource(Res.string.sales_available)}: ${a.capacity.remaining ?: "—"} · ${percent(a.capacity.percentSold)}")

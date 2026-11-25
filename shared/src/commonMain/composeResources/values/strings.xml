@@ -759,4 +759,9 @@
     <string name="support_history_nobody">nobody</string>
     <string name="event_error_has_tickets">Tickets are already sold: the event cannot be unpublished. Cancel it instead.</string>
     <string name="event_error_ended">The event has already ended and cannot be cancelled.</string>
+    <string name="payment_demo_banner">Demo payment: no real money is charged</string>
+    <string name="catalog_few_left">Few seats left</string>
+    <string name="ticket_card_type">Ticket</string>
+    <string name="ticket_card_attendee">Attendee</string>
+    <string name="ticket_card_hint">Show this code at the entrance. Printed and electronic copies are the same ticket.</string>
 </resources>

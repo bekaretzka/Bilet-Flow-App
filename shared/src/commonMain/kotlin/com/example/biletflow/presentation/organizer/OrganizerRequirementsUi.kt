@@ -55,7 +55,7 @@ fun OrganizerRequirementPage(vm: PaidSalesViewModel) {
         TextButton(onClick = vm::back, enabled = !state.submitting) { Text(stringResource(Res.string.ticket_create_back)) }
         Text(stringResource(if (verification) Res.string.paid_identity else Res.string.paid_account), style = MaterialTheme.typography.headlineMedium)
         Text(state.title)
-        Text(stringResource(Res.string.organizer_requirement_simulated))
+        com.example.biletflow.core.designsystem.DemoBanner(stringResource(Res.string.organizer_requirement_simulated))
         fields.forEach { key ->
             val label = when (key) {
                 "legal_name" -> Res.string.organizer_legal_name
