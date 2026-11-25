@@ -92,16 +92,16 @@ fun LoginPage(
         FormField(form.password, viewModel::updatePassword, stringResource(Res.string.auth_password_placeholder), password = true)
         val forgot by viewModel.forgot.collectAsState()
         TextButton(onClick = viewModel::forgotPassword, enabled = !forgot.sending && !state.isLoading, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-            Text(stringResource(Res.string.auth_forgot_password), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.auth_forgot_password), color = Purple, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
         when {
-            forgot.sending -> Text(stringResource(Res.string.auth_forgot_sending), fontSize = 12.sp)
-            forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 12.sp)
-            forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 12.sp)
-            forgot.message != null -> Text(forgot.message?.ifBlank { null } ?: stringResource(Res.string.auth_forgot_sent), fontSize = 12.sp)
+            forgot.sending -> Text(stringResource(Res.string.auth_forgot_sending), fontSize = 13.sp)
+            forgot.invalidEmail -> Text(stringResource(Res.string.auth_forgot_enter_email), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 13.sp)
+            forgot.failed -> Text(stringResource(Res.string.auth_forgot_failed), color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 13.sp)
+            forgot.message != null -> Text(forgot.message?.ifBlank { null } ?: stringResource(Res.string.auth_forgot_sent), fontSize = 13.sp)
         }
         if (forgot.message != null && onResetLink != null) TextButton(onClick = onResetLink, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-            Text(stringResource(Res.string.reset_password_have_link), color = Purple, fontSize = 12.sp)
+            Text(stringResource(Res.string.reset_password_have_link), color = Purple, fontSize = 14.sp)
         }
         AuthFeedback(state)
         Spacer(Modifier.height(10.dp))
@@ -113,7 +113,7 @@ fun LoginPage(
         (onOpenRegistration ?: viewModel::openRegistration).let { openRegistration ->
             Spacer(Modifier.height(14.dp))
             TextButton(onClick = openRegistration, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(Res.string.auth_no_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(Res.string.auth_no_account), color = Purple, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -132,6 +132,7 @@ fun RegistrationPage(viewModel: AuthViewModel, onOpenLogin: () -> Unit) {
         )
         FormLabel(stringResource(Res.string.auth_email_label))
         FormField(form.email, viewModel::updateEmail, stringResource(Res.string.auth_email_placeholder))
+        Text(stringResource(Res.string.auth_email_hint_registration), color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
         Spacer(Modifier.height(12.dp))
         FormLabel(stringResource(Res.string.auth_password_label))
         FormField(form.password, viewModel::updatePassword, stringResource(Res.string.auth_password_registration_placeholder), password = true)
@@ -149,14 +150,14 @@ fun RegistrationPage(viewModel: AuthViewModel, onOpenLogin: () -> Unit) {
         Text(
             stringResource(Res.string.auth_terms),
             color = Muted,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(4.dp))
         TextButton(onClick = onOpenLogin, enabled = !state.isLoading, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(Res.string.auth_have_account), color = Purple, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(Res.string.auth_have_account), color = Purple, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -182,21 +183,21 @@ private fun AuthLayout(content: @Composable () -> Unit) {
 
 @Composable
 private fun Brand() {
-    Text(stringResource(Res.string.brand_name), color = Ink, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Text(stringResource(Res.string.brand_name), color = Ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
 }
 
 @Composable
 private fun PageTitle(title: String, subtitle: String) {
     Spacer(Modifier.height(24.dp))
-    Text(title, color = Ink, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
+    Text(title, color = Ink, fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
     Spacer(Modifier.height(6.dp))
-    Text(subtitle, color = Muted, fontSize = 13.sp, lineHeight = 18.sp)
+    Text(subtitle, color = com.example.biletflow.core.designsystem.BF.ink2, fontSize = 15.sp, lineHeight = 21.sp)
     Spacer(Modifier.height(22.dp))
 }
 
 @Composable
 private fun FormLabel(text: String) {
-    Text(text, color = Ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    Text(text, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     Spacer(Modifier.height(6.dp))
 }
 
@@ -212,10 +213,10 @@ private fun FormField(
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        placeholder = { Text(placeholder, color = Muted, fontSize = 13.sp) },
-        textStyle = TextStyle(color = Ink, fontSize = 14.sp),
+        placeholder = { Text(placeholder, color = Muted, fontSize = 15.sp) },
+        textStyle = TextStyle(color = Ink, fontSize = 15.sp),
         visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Purple,
             unfocusedBorderColor = FieldBorder,
@@ -231,12 +232,12 @@ private fun PrimaryButton(text: String, enabled: Boolean = true, onClick: () -> 
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
     ) {
         if (enabled) {
-            Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         } else {
             CircularProgressIndicator(
                 color = Color.White,
@@ -269,8 +270,8 @@ private fun AuthFeedback(state: AuthUiState) {
                 AuthRequestError.Server -> stringResource(Res.string.auth_request_failed)
             },
             color = Error,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
@@ -278,8 +279,8 @@ private fun AuthFeedback(state: AuthUiState) {
         Text(
             text = message,
             color = Error,
-            fontSize = 11.sp,
-            lineHeight = 15.sp,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
@@ -290,7 +291,7 @@ private fun AuthFeedback(state: AuthUiState) {
         Text(
             text = stringResource(Res.string.auth_request_success),
             color = Purple,
-            fontSize = 11.sp,
+            fontSize = 13.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
     }

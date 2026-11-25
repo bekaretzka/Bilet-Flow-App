@@ -3,6 +3,15 @@ package com.example.biletflow.presentation.organizer
 import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
+import com.example.biletflow.core.designsystem.BF
+import com.example.biletflow.core.designsystem.BfIcon
+import com.example.biletflow.core.designsystem.HeadingFont
+import com.example.biletflow.core.designsystem.Tag
+import com.example.biletflow.core.designsystem.Tone
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -79,35 +88,50 @@ class StaffEventsViewModel(
     }
 }
 
+/** Figma «Сканер / Выбор события»: cards with a lifecycle tag; the event that is on now is outlined and has «Сканировать». */
 @Composable
 fun StaffEventsPage(vm: StaffEventsViewModel, onEvent: (Event) -> Unit = {}) {
     val state by vm.state.collectAsState()
-    Column(Modifier.fillMaxSize().statusBarsPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        TextButton(onClick = vm::close) { Text(stringResource(Res.string.organizer_back)) }
-        Text(stringResource(Res.string.staff_events_title), style = MaterialTheme.typography.headlineLarge)
-        if (state.accessLost) Text(stringResource(Res.string.check_access_lost), color = MaterialTheme.colorScheme.error)
-        TextButton(onClick = vm::reload, enabled = !state.loading) { Text(stringResource(Res.string.my_events_refresh)) }
-        when {
-            state.loading -> CircularProgressIndicator()
-            state.error -> {
-                Text(stringResource(Res.string.staff_events_error))
-                Button(onClick = vm::reload) { Text(stringResource(Res.string.events_retry)) }
-            }
-            state.events.isEmpty() -> Text(stringResource(Res.string.staff_events_empty))
-            else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(state.events, key = { it.id }) { event ->
-                    Card(onClick = { onEvent(event) }, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(event.title, style = MaterialTheme.typography.titleLarge)
-                            Text(formatEventDate(event.startTime))
-                            event.venueName?.takeIf { it.isNotBlank() }?.let { Text(it) }
-                            Text(when (event.status) {
-                                "published" -> stringResource(Res.string.staff_events_published)
-                                "cancelled" -> stringResource(Res.string.staff_events_cancelled)
-                                else -> event.status
-                            }, color = if (event.status == "cancelled") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = vm::close) { Text("←", fontSize = 22.sp, color = BF.ink) }
+            Text(stringResource(Res.string.staff_events_title), fontFamily = HeadingFont, fontWeight = FontWeight.Bold, fontSize = 22.sp,
+                color = BF.ink, modifier = Modifier.weight(1f))
+            TextButton(onClick = vm::reload, enabled = !state.loading) { Text(stringResource(Res.string.my_events_refresh)) }
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (state.accessLost) Text(stringResource(Res.string.check_access_lost), color = BF.dangerFg)
+            when {
+                state.loading -> CircularProgressIndicator()
+                state.error -> {
+                    Text(stringResource(Res.string.staff_events_error))
+                    Button(onClick = vm::reload) { Text(stringResource(Res.string.events_retry)) }
+                }
+                state.events.isEmpty() -> Text(stringResource(Res.string.staff_events_empty), color = BF.muted)
+                else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(state.events, key = { it.id }) { event ->
+                        val live = event.status != "cancelled" && event.lifecycle == "active"
+                        Surface(onClick = { onEvent(event) }, modifier = Modifier.fillMaxWidth(), shape = BF.radiusCard, color = BF.surface,
+                            border = BorderStroke(if (live) 2.dp else 1.dp, if (live) BF.primary else BF.line)) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(event.title, fontFamily = HeadingFont, fontWeight = FontWeight.Medium, fontSize = 16.sp, color = BF.ink, modifier = Modifier.weight(1f))
+                                    when {
+                                        event.status == "cancelled" -> Tag(stringResource(Res.string.staff_events_cancelled), Tone.Danger)
+                                        live -> Tag(stringResource(Res.string.staff_tag_live), Tone.Ok)
+                                        event.lifecycle == "completed" -> Tag(stringResource(Res.string.staff_tag_done), Tone.Neutral)
+                                        else -> Tag(stringResource(Res.string.staff_tag_later), Tone.Neutral)
+                                    }
+                                }
+                                Text(listOfNotNull(formatEventDate(event.startTime), event.venueName?.takeIf { it.isNotBlank() }).joinToString(" · "),
+                                    color = BF.ink2, fontSize = 14.sp)
+                                if (live) Button(onClick = { onEvent(event) }, modifier = Modifier.fillMaxWidth()) {
+                                    BfIcon(Res.drawable.ic_qr, size = 20.dp); Spacer(Modifier.width(8.dp)); Text(stringResource(Res.string.camera_scan))
+                                }
+                            }
                         }
                     }
+                    item { Text(stringResource(Res.string.staff_events_note), color = BF.muted, fontSize = 13.sp) }
                 }
             }
         }

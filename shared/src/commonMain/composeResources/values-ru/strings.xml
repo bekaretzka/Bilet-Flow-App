@@ -774,4 +774,19 @@
     <string name="scan_title_not_ticket">Это не билет</string>
     <string name="scan_ticket_type">Тип билета</string>
     <string name="scan_checked_by">Кто отметил</string>
+    <string name="checkout_title">Оформление</string>
+    <string name="checkout_attendee_title">Данные участника</string>
+    <string name="checkout_name_placeholder">Будет указано на билете</string>
+    <string name="checkout_order_title">Ваш заказ</string>
+    <string name="checkout_payment_title">Способ оплаты</string>
+    <string name="checkout_test_card">Тестовая карта (симуляция)</string>
+    <string name="checkout_test_card_hint">Платёж не проводится через банк</string>
+    <string name="checkout_terms">Согласен с условиями и политикой возврата организатора</string>
+    <string name="checkout_submit">Оформить · %1$s (демо)</string>
+    <string name="checkout_footer">Билет выдаётся только после подтверждения оплаты</string>
+    <string name="auth_email_hint_registration">Сюда придёт письмо для подтверждения</string>
+    <string name="staff_tag_live">Идёт вход</string>
+    <string name="staff_tag_later">Позже</string>
+    <string name="staff_tag_done">Завершено</string>
+    <string name="staff_events_note">Видны только события, на которые вас назначил организатор.</string>
 </resources>

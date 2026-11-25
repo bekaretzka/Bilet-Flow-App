@@ -3,6 +3,7 @@ package com.example.biletflow.presentation.organizer
 import com.example.biletflow.core.designsystem.Card
 import com.example.biletflow.core.designsystem.TextButton
 import com.example.biletflow.core.designsystem.Button
+import com.example.biletflow.core.designsystem.OutlinedButton
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -308,7 +310,8 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
         }
         item {
             OutlinedTextField(value = state.query, onValueChange = vm::query, modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(Res.string.check_search_hint)) }, singleLine = true, isError = state.invalidQuery, enabled = !state.checkingIn,
+                placeholder = { Text(stringResource(Res.string.check_search_hint)) }, singleLine = true, isError = state.invalidQuery, enabled = !state.checkingIn,
+                leadingIcon = { com.example.biletflow.core.designsystem.BfIcon(Res.drawable.ic_search, size = 20.dp, tint = com.example.biletflow.core.designsystem.BF.muted) },
                 supportingText = { Text(stringResource(if (state.invalidQuery) Res.string.check_query_length else Res.string.check_search_rules)) },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { vm.search() }))
             Button(onClick = vm::search, enabled = !state.searching && !state.checkingIn) { Text(stringResource(Res.string.check_find)) }
@@ -320,18 +323,24 @@ fun CheckInOverviewPage(vm: CheckInOverviewViewModel, onBack: () -> Unit) {
             if (state.searched && state.tickets.isEmpty()) Text(stringResource(Res.string.check_search_empty))
         }
         items(state.tickets, key = { it.id }) { ticket ->
+            // Figma «Поиск участника»: name, «тип · код», status at the top right; «Отметить вход» or «Отменить чек-ин».
+            val idle = !state.checkingIn && !state.searching && state.unknownCode == null
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${stringResource(Res.string.attendees_ticket)} #${ticket.id}", style = MaterialTheme.typography.titleMedium)
-                    ticket.attendeeName?.let { Text(it) }; ticket.ticketTypeName?.let { Text(it) }
-                    Text(ticket.code)
-                    com.example.biletflow.core.designsystem.TicketStatusChip(ticket.status)
-                    ticket.checkedInAt?.let { Text(scannedText(it, ticket.checkedInBy)) }
-                    Button(onClick = { vm.askCheckIn(ticket) }, enabled = !state.checkingIn && !state.searching && state.unknownCode == null) {
-                        Text(stringResource(Res.string.check_action))
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text(ticket.attendeeName?.takeIf { it.isNotBlank() } ?: "${stringResource(Res.string.attendees_ticket)} #${ticket.id}",
+                                style = MaterialTheme.typography.titleMedium)
+                            Text(listOfNotNull(ticket.ticketTypeName, ticket.code).joinToString(" · "), color = com.example.biletflow.core.designsystem.BF.muted,
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                        com.example.biletflow.core.designsystem.TicketStatusChip(ticket.status)
                     }
-                    if (ticket.status == "checked_in") TextButton(onClick = { vm.askUndo(ticket) }, enabled = !state.checkingIn && !state.searching && state.unknownCode == null) {
+                    ticket.checkedInAt?.let { Text(scannedText(it, ticket.checkedInBy), style = MaterialTheme.typography.bodySmall) }
+                    if (ticket.status == "checked_in") OutlinedButton(onClick = { vm.askUndo(ticket) }, enabled = idle, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(Res.string.undo_action))
+                    } else Button(onClick = { vm.askCheckIn(ticket) }, enabled = idle, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(Res.string.check_action))
                     }
                 }
             }

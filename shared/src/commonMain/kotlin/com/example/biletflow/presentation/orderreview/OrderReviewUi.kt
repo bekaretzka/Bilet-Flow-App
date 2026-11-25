@@ -25,6 +25,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import com.example.biletflow.core.designsystem.BF
+import com.example.biletflow.core.designsystem.HeadingFont
+import com.example.biletflow.core.designsystem.DemoBanner
+import com.example.biletflow.core.designsystem.SectionCard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,162 +82,147 @@ fun OrderReviewPage(
         orderState.createdOrder?.let(onOrderCreated)
     }
 
+    // Figma «Зритель / Оформление»: header, demo banner, then cards «Данные участника», «Ваш заказ», «Способ оплаты».
+    var termsAccepted by remember(event?.id) { mutableStateOf(false) }
+    val editable = !orderState.isSubmitting && orderState.createdOrder == null
+    val fieldColors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Purple, unfocusedBorderColor = FieldBorder,
+        focusedContainerColor = Color.White, unfocusedContainerColor = Color.White, cursorColor = Purple)
     Column(
-        modifier = Modifier.fillMaxSize().background(PageBackground)
-            .statusBarsPadding().padding(horizontal = 24.dp),
+        modifier = Modifier.fillMaxSize().background(PageBackground).statusBarsPadding(),
     ) {
         ReviewHeader(onBack)
         Column(
-            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Spacer(Modifier.height(24.dp))
-            Text(
-                stringResource(Res.string.order_review_title),
-                color = Ink,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = com.example.biletflow.core.designsystem.HeadingFont,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                event?.title.orEmpty(),
-                color = Muted,
-                fontSize = 17.sp,
-                lineHeight = 23.sp,
-            )
-            Spacer(Modifier.height(24.dp))
-            selectedItems.forEachIndexed { index, item ->
-                ReviewItem(item)
-                if (index != selectedItems.lastIndex) Spacer(Modifier.height(12.dp))
-            }
+            Spacer(Modifier.height(4.dp))
+            DemoBanner(stringResource(Res.string.payment_demo_banner))
             if (selectedItems.isEmpty()) {
-                Text(stringResource(Res.string.order_review_empty), color = Muted, fontSize = 16.sp)
+                Text(stringResource(Res.string.order_review_empty), color = Muted, fontSize = 15.sp)
+            } else if (!isAuthenticated) {
+                OrderSummaryCard(event?.title, selectedItems, total, null, orderState, requestItems, editable = false,
+                    onPromo = {}, onPromoChange = {})
+                if (orderState.error == OrderCreationError.Unauthorized) Text(stringResource(Res.string.order_error_unauthorized),
+                    color = BF.dangerFg, fontSize = 14.sp, lineHeight = 20.sp)
+                Button(onClick = onLogin, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                    Text(stringResource(if (orderState.error == OrderCreationError.Unauthorized) Res.string.order_login_again else Res.string.order_review_login),
+                        fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
             } else {
-                Spacer(Modifier.height(20.dp))
-                ReviewTotal(totalQuantity = totalQuantity, total = total)
-                if (!isAuthenticated) {
-                    Spacer(Modifier.height(16.dp))
-                    if (orderState.error == OrderCreationError.Unauthorized) {
-                        Text(
-                            stringResource(Res.string.order_error_unauthorized),
-                            color = com.example.biletflow.core.designsystem.BF.dangerFg,
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-                    Button(
-                        onClick = onLogin,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
-                    ) {
-                        Text(
-                            stringResource(
-                                if (orderState.error == OrderCreationError.Unauthorized) {
-                                    Res.string.order_login_again
-                                } else {
-                                    Res.string.order_review_login
-                                },
-                            ),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                } else {
-                    Spacer(Modifier.height(20.dp))
+                SectionCard {
+                    CardTitle(stringResource(Res.string.checkout_attendee_title))
+                    FieldLabel(stringResource(Res.string.order_buyer_name))
                     OutlinedTextField(
-                        value = orderState.buyerName,
-                        onValueChange = orderViewModel::updateBuyerName,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !orderState.isSubmitting && orderState.createdOrder == null,
-                        singleLine = true,
-                        label = { Text(stringResource(Res.string.order_buyer_name)) },
-                        supportingText = if (orderState.error == OrderCreationError.InvalidName) {
-                            { Text(stringResource(Res.string.order_buyer_name_error), color = com.example.biletflow.core.designsystem.BF.dangerFg) }
-                        } else null,
+                        value = orderState.buyerName, onValueChange = orderViewModel::updateBuyerName,
+                        modifier = Modifier.fillMaxWidth(), enabled = editable, singleLine = true, colors = fieldColors,
+                        placeholder = { Text(stringResource(Res.string.checkout_name_placeholder), color = Muted, fontSize = 15.sp) },
                         isError = orderState.error == OrderCreationError.InvalidName,
                     )
-                    val editable = !orderState.isSubmitting && orderState.createdOrder == null
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(Res.string.order_attendees_help), color = Muted, fontSize = 14.sp)
-                    selectedItems.forEach { item ->
-                        repeat(item.quantity) { index ->
-                            OutlinedTextField(
-                                value = orderState.attendeeNames[item.ticketType.id]?.getOrNull(index).orEmpty(),
-                                onValueChange = { orderViewModel.updateAttendeeName(item.ticketType.id, index, it) },
-                                modifier = Modifier.fillMaxWidth(), enabled = editable, singleLine = true,
-                                label = { Text("${item.ticketType.name} · ${stringResource(Res.string.order_attendee_name)} ${index + 1}") },
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = orderState.promoCode,
-                            onValueChange = orderViewModel::updatePromoCode,
-                            modifier = Modifier.weight(1f), enabled = editable, singleLine = true,
-                            label = { Text(stringResource(Res.string.order_promo_code)) },
-                            isError = orderState.promoError != null,
-                        )
-                        TextButton(
-                            onClick = { event?.let { orderViewModel.applyPromo(it.id, requestItems) } },
-                            enabled = editable && !orderState.previewing && requestItems.isNotEmpty(),
-                        ) { Text(stringResource(Res.string.order_promo_apply), color = Purple) }
-                    }
-                    if (orderState.previewing) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
-                    orderState.promoError?.let { code ->
-                        Text(when (code) {
-                            "PromoCodeNotFoundError" -> stringResource(Res.string.promo_not_found)
-                            "PromoCodeNotActiveError" -> stringResource(Res.string.promo_not_active)
-                            "PromoCodeUsedUpError" -> stringResource(Res.string.promo_used_up)
-                            "PromoCodeNotApplicableError" -> stringResource(Res.string.promo_not_applicable)
-                            else -> "${stringResource(Res.string.order_error_server)} ($code)"
-                        }, color = com.example.biletflow.core.designsystem.BF.dangerFg, fontSize = 14.sp)
-                    }
-                    if (orderState.previewValid(requestItems)) orderState.preview?.let { preview ->
-                        Text("${stringResource(Res.string.order_subtotal)}: ${preview.subtotal} ₸", color = Ink)
-                        Text("${stringResource(Res.string.order_discount)}: −${preview.discount} ₸", color = Ink)
-                        Text("${stringResource(Res.string.order_server_total)}: ${preview.total} ₸", color = Ink, fontWeight = FontWeight.Bold)
-                        if (preview.total == 0L) Text(stringResource(Res.string.order_free_after_discount), color = Muted, fontSize = 14.sp)
-                    } else if (orderState.preview != null) Text(stringResource(Res.string.order_preview_stale), color = Muted, fontSize = 14.sp)
-                    OrderError(
-                        error = orderState.error,
-                        conflictCode = orderState.conflictCode,
-                        onLogin = onLogin,
-                        onConflict = onConflict,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Button(
-                        onClick = {
-                            event?.let {
-                                orderViewModel.submit(eventId = it.id, items = requestItems)
+                    if (orderState.error == OrderCreationError.InvalidName)
+                        Text(stringResource(Res.string.order_buyer_name_error), color = BF.dangerFg, fontSize = 13.sp)
+                    if (totalQuantity > 1) {
+                        Text(stringResource(Res.string.order_attendees_help), color = Muted, fontSize = 13.sp)
+                        selectedItems.forEach { item ->
+                            repeat(item.quantity) { index ->
+                                FieldLabel("${item.ticketType.name} · ${stringResource(Res.string.order_attendee_name)} ${index + 1}")
+                                OutlinedTextField(
+                                    value = orderState.attendeeNames[item.ticketType.id]?.getOrNull(index).orEmpty(),
+                                    onValueChange = { orderViewModel.updateAttendeeName(item.ticketType.id, index, it) },
+                                    modifier = Modifier.fillMaxWidth(), enabled = editable, singleLine = true, colors = fieldColors,
+                                )
                             }
-                        },
-                        enabled = requestItems.isNotEmpty() && !orderState.isSubmitting &&
-                            orderState.error != OrderCreationError.UnknownResult,
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Purple, contentColor = Color.White),
-                    ) {
-                        if (orderState.isSubmitting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.height(22.dp),
-                                color = Color.White,
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(
-                                stringResource(Res.string.order_create),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
                         }
                     }
                 }
+                OrderSummaryCard(event?.title, selectedItems, total, orderState.preview?.takeIf { orderState.previewValid(requestItems) },
+                    orderState, requestItems, editable,
+                    onPromo = { event?.let { orderViewModel.applyPromo(it.id, requestItems) } }, onPromoChange = orderViewModel::updatePromoCode)
+                SectionCard {
+                    CardTitle(stringResource(Res.string.checkout_payment_title))
+                    Surface(Modifier.fillMaxWidth(), shape = BF.radiusControl, color = BF.primarySoft, border = BorderStroke(1.5.dp, BF.primary)) {
+                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            RadioButton(selected = true, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = BF.primary))
+                            Column {
+                                Text(stringResource(Res.string.checkout_test_card), color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(Res.string.checkout_test_card_hint), color = BF.ink2, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().toggleable(value = termsAccepted, enabled = editable, role = Role.Checkbox) { termsAccepted = it },
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Checkbox(checked = termsAccepted, onCheckedChange = null, enabled = editable,
+                            colors = CheckboxDefaults.colors(checkedColor = BF.primary, uncheckedColor = BF.lineField))
+                        Text(stringResource(Res.string.checkout_terms), color = BF.ink2, fontSize = 14.sp, lineHeight = 19.sp)
+                    }
+                    event?.refundPolicy?.takeIf { it.isNotBlank() }?.let { Text(it, color = Muted, fontSize = 13.sp, lineHeight = 18.sp) }
+                }
+                OrderError(error = orderState.error, conflictCode = orderState.conflictCode, onLogin = onLogin, onConflict = onConflict)
+                val payable = orderState.preview?.takeIf { orderState.previewValid(requestItems) }?.total ?: total
+                Button(
+                    onClick = { event?.let { orderViewModel.submit(eventId = it.id, items = requestItems) } },
+                    enabled = termsAccepted && requestItems.isNotEmpty() && !orderState.isSubmitting &&
+                        orderState.error != OrderCreationError.UnknownResult,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) {
+                    if (orderState.isSubmitting) CircularProgressIndicator(modifier = Modifier.height(22.dp), color = Color.White, strokeWidth = 2.dp)
+                    else Text(stringResource(Res.string.checkout_submit, formatPrice(payable)), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Text(stringResource(Res.string.checkout_footer), color = Muted, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun CardTitle(text: String) = Text(text, color = Ink, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold, fontFamily = HeadingFont)
+
+@Composable
+private fun FieldLabel(text: String) = Text(text, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+
+/** «Ваш заказ»: lines «Тип × N … сумма», promo code, server preview, «Итого». */
+@Composable
+private fun OrderSummaryCard(eventTitle: String?, items: List<SelectedTicket>, total: Long, preview: com.example.biletflow.domain.models.OrderPreview?,
+    orderState: OrderCreationUiState, requestItems: List<CreateOrderItem>, editable: Boolean, onPromo: () -> Unit, onPromoChange: (String) -> Unit) {
+    SectionCard {
+        CardTitle(stringResource(Res.string.checkout_order_title))
+        eventTitle?.let { Text(it, color = Muted, fontSize = 13.sp) }
+        items.forEach { item ->
+            ReviewValueRow("${item.ticketType.name} × ${item.quantity}", formatPrice(item.ticketType.price.toLong() * item.quantity))
+        }
+        if (editable) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = orderState.promoCode, onValueChange = onPromoChange, modifier = Modifier.weight(1f), singleLine = true,
+                    placeholder = { Text(stringResource(Res.string.order_promo_code), color = Muted, fontSize = 15.sp) },
+                    isError = orderState.promoError != null)
+                TextButton(onClick = onPromo, enabled = !orderState.previewing && requestItems.isNotEmpty()) {
+                    Text(stringResource(Res.string.order_promo_apply), color = Purple)
+                }
+            }
+            if (orderState.previewing) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
+            orderState.promoError?.let { code ->
+                Text(when (code) {
+                    "PromoCodeNotFoundError" -> stringResource(Res.string.promo_not_found)
+                    "PromoCodeNotActiveError" -> stringResource(Res.string.promo_not_active)
+                    "PromoCodeUsedUpError" -> stringResource(Res.string.promo_used_up)
+                    "PromoCodeNotApplicableError" -> stringResource(Res.string.promo_not_applicable)
+                    else -> "${stringResource(Res.string.order_error_server)} ($code)"
+                }, color = BF.dangerFg, fontSize = 13.sp)
+            }
+            if (preview == null && orderState.preview != null) Text(stringResource(Res.string.order_preview_stale), color = Muted, fontSize = 13.sp)
+        }
+        preview?.takeIf { it.discount > 0 }?.let {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("${stringResource(Res.string.order_discount)} ${it.promoCode.orEmpty()}", color = Purple, fontSize = 14.sp)
+                Text("−${formatPrice(it.discount)}", color = Purple, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            }
+        }
+        HorizontalDivider(color = BF.line)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(Res.string.order_review_total), color = Ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(formatPrice(preview?.total ?: total), color = Ink, fontSize = 24.sp, fontWeight = FontWeight.Bold, fontFamily = HeadingFont)
+        }
+        if (preview?.total == 0L) Text(stringResource(Res.string.order_free_after_discount), color = Muted, fontSize = 13.sp)
     }
 }
 
@@ -267,16 +263,16 @@ private fun OrderError(
 @Composable
 private fun ReviewHeader(onBack: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TextButton(
             onClick = onBack,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
         ) {
-            Text("‹", color = Ink, fontSize = 32.sp, modifier = Modifier.padding(end = 8.dp))
+            Text("←", color = Ink, fontSize = 22.sp, modifier = Modifier.padding(end = 10.dp))
         }
-        Text("BiletFlow", color = Ink, fontSize = 21.sp, fontWeight = FontWeight.Bold, fontFamily = com.example.biletflow.core.designsystem.HeadingFont)
+        Text(stringResource(Res.string.checkout_title), color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold, fontFamily = HeadingFont)
     }
 }
 
