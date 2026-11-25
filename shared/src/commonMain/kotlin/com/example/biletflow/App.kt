@@ -48,8 +48,8 @@ import com.example.biletflow.presentation.orderhistory.OrderHistoryViewModel
 @Composable
 fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.domain.session.SessionStorage? = null,
     registerBack: (((() -> Unit)?) -> Unit)? = null,
-    /** A link that opened the app (Campaign QR: `...?campaign=C-...`). Resolved once per distinct link. */
-    initialLink: String? = null,
+    /** Website host whose event pages (`/events/{id}`, Campaign QR `?campaign=`) open the app; blank ignores all links. */
+    webHost: String = "",
 ) {
     MaterialTheme {
         var selectedEventId by remember { mutableStateOf<Int?>(null) }
@@ -261,23 +261,31 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                 previousAccount=null; selectedTab=0
             }
         }
-        // Campaign QR link: GET /campaign-links/{token} counts an open, so it runs once per link (saved across recreation).
-        var handledLink by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+        // Incoming event links (core/links/IncomingLinks): this point is reached only after the session is restored.
+        // Each delivered link is taken once; GET /campaign-links/{token} counts an open, so a taken link is never retried.
         var campaignLinkError by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(initialLink) {
-            val link = initialLink ?: return@LaunchedEffect
-            if (handledLink == link) return@LaunchedEffect
-            handledLink = link
-            val token = com.example.biletflow.data.repositories.campaignTokenFromLink(link) ?: return@LaunchedEffect
-            try {
-                val resolved = com.example.biletflow.data.repositories.resolveCampaignLink(apiClient, com.example.biletflow.core.network.apiBaseUrl, token)
-                orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
-                completedOrder = null; selectedTicketId = null; showOrderReview = false; selectedTab = 0
-                selectedEventId = resolved.eventId
-                resolved.promoCode?.let(orderViewModel::prefillPromoCode)
-            } catch (error: Exception) {
-                if (error is kotlinx.coroutines.CancellationException) throw error
-                campaignLinkError = (error as? com.example.biletflow.data.repositories.CampaignApiException)?.code ?: "network"
+        LaunchedEffect(Unit) {
+            com.example.biletflow.core.links.IncomingLinks.pending.collect { pending ->
+                if (pending == null) return@collect
+                val link = com.example.biletflow.core.links.IncomingLinks.take() ?: return@collect
+                val parsed = com.example.biletflow.core.links.parseEventLink(link, webHost) ?: return@collect
+                val openEvent = { eventId: Int, promoCode: String? ->
+                    orderViewModel.reset(); paymentViewModel.reset(); ticketQrViewModel.reset()
+                    completedOrder = null; selectedTicketId = null; showOrderReview = false; orderOpenedFromHistory = false
+                    selectedTab = 0
+                    selectedEventId = eventId
+                    // stays in the order form across a login: signing in from no account does not reset orderViewModel
+                    promoCode?.let(orderViewModel::prefillPromoCode)
+                }
+                val token = parsed.campaignToken
+                if (token == null) { openEvent(parsed.eventId, null); return@collect }
+                try {
+                    val resolved = com.example.biletflow.data.repositories.resolveCampaignLink(apiClient, com.example.biletflow.core.network.apiBaseUrl, token)
+                    openEvent(resolved.eventId, resolved.promoCode)
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    campaignLinkError = (error as? com.example.biletflow.data.repositories.CampaignApiException)?.code ?: "network"
+                }
             }
         }
         campaignLinkError?.let { code -> AlertDialog(onDismissRequest = { campaignLinkError = null },
