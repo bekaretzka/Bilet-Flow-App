@@ -681,6 +681,8 @@
     <string name="support_unassign">Unassign</string>
     <string name="support_assign_other">Assign another admin…</string>
     <string name="support_assign_to">Assign to user</string>
+    <string name="support_admin_email">Admin email</string>
+    <string name="support_admin_none">No admins found for this email.</string>
     <string name="support_assign_failed">Unable to change the assignee.</string>
     <string name="support_assignee_invalid">This user cannot handle the case.</string>
     <string name="support_assign_unknown">The result is unknown; the case was re-read. Check the assignee before trying again.</string>

@@ -681,6 +681,8 @@
     <string name="support_unassign">Снять назначение</string>
     <string name="support_assign_other">Назначить другого админа…</string>
     <string name="support_assign_to">Назначить пользователя</string>
+    <string name="support_admin_email">Email админа</string>
+    <string name="support_admin_none">Админы с таким email не найдены.</string>
     <string name="support_assign_failed">Не удалось изменить ответственного.</string>
     <string name="support_assignee_invalid">Этот пользователь не может обрабатывать обращение.</string>
     <string name="support_assign_unknown">Результат неизвестен; обращение перечитано. Проверьте ответственного перед повтором.</string>

@@ -26,6 +26,7 @@ data class SupportCase(val id:Int,val kind:String,val category:String,val subjec
     @SerialName("created_at") val createdAt:String,@SerialName("updated_at") val updatedAt:String,
     val messages:List<SupportCaseMessage> = emptyList())
 /** PATCH /status result; [includesMessages] is false when the body had no messages array, so the caller re-reads the case. */
+data class AdminCandidate(val id:Int,val email:String?)
 data class SupportStatusResult(val case:SupportCase,val includesMessages:Boolean)
 
 class SupportApiException(val statusCode:Int,val code:String?,val fields:Set<String>,override val message:String):Exception(message)
@@ -73,12 +74,16 @@ class SupportCasesRepository(private val client:HttpClient,private val requests:
         require(case.id==id)
         SupportStatusResult(case,json["messages"] is JsonArray)
     }
-    /** Platform admins for the assignee picker: GET /admin/users has no is_platform_admin filter, so rows are filtered here. */
-    suspend fun admins():List<Int> = requests.request { token ->
-        val response=client.get("$baseUrl/admin/users") {bearerAuth(token);parameter("limit",200)}
+    /** Platform admins for the assignee picker, searched by email via GET /admin/users?q=; the endpoint has no
+     *  is_platform_admin filter, so only matching rows with is_platform_admin=true are kept. */
+    suspend fun searchAdmins(query:String):List<AdminCandidate> = requests.request { token ->
+        val response=client.get("$baseUrl/admin/users") {bearerAuth(token);parameter("q",query.trim());parameter("limit",50)}
         response.checkStatus(200)
         val items=Json.parseToJsonElement(response.bodyAsText()).jsonObject["items"]?.jsonArray.orEmpty()
-        items.mapNotNull { it as? JsonObject }.filter { (it["is_platform_admin"] as? JsonPrimitive)?.booleanOrNull==true }.mapNotNull { (it["id"] as? JsonPrimitive)?.intOrNull }
+        items.mapNotNull { it as? JsonObject }.filter { (it["is_platform_admin"] as? JsonPrimitive)?.booleanOrNull==true }.mapNotNull { row ->
+            val id=(row["id"] as? JsonPrimitive)?.intOrNull ?: return@mapNotNull null
+            AdminCandidate(id,(row["email"] as? JsonPrimitive)?.contentOrNull)
+        }
     }
     suspend fun eventInbox(eventId:Int):List<SupportCase> = inbox().filter { it.eventId==eventId }
     suspend fun get(id:Int):SupportCase = read<SupportCase>("/support/cases/$id").also { require(it.id==id) }

@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import com.example.biletflow.presentation.events.EventContextCaption
 import com.example.biletflow.domain.repositories.EventsRepository
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import biletflow.shared.generated.resources.*
@@ -44,7 +45,8 @@ data class SupportCasesState(val open:Boolean=false,val eventId:Int?=null,val ev
     val unavailable:Boolean=false, val handler:Boolean=false,
     val adminInbox:Boolean=false,val kindFilter:String?=null,val statusFilter:String?=null,
     val assignBusy:Boolean=false,val assignError:SupportFailure?=null,val assignUnknown:Boolean=false,
-    val admins:List<Int>?=null,val adminsError:String?=null,val isAdmin:Boolean=false) {
+    val adminQuery:String="",val adminsBusy:Boolean=false,
+    val admins:List<AdminCandidate>?=null,val adminsError:String?=null,val isAdmin:Boolean=false) {
     /** Being the requester does not revoke independently verified handler rights. */
     val canManageStatus:Boolean get() = handler && !statusDenied && myId!=null && detail!=null
 }
@@ -257,17 +259,20 @@ class SupportCasesViewModel(client:HttpClient,requests:SessionOrdersRepository,p
             }
         }
     }
-    /** Other admins for the picker (admin only): /admin/users rows with is_platform_admin=true. */
-    fun loadAdmins() {
-        if(!mutable.value.isAdmin || mutable.value.admins!=null) return
+    fun updateAdminQuery(value:String) { mutable.value=mutable.value.copy(adminQuery=value.take(254)) }
+    /** Other admins for the picker (admin only): GET /admin/users?q=<email> rows with is_platform_admin=true. */
+    fun searchAdmins() {
+        val query=mutable.value.adminQuery.trim()
+        if(!mutable.value.isAdmin || mutable.value.adminsBusy || query.isEmpty()) return
         val expected=session.generation
+        mutable.value=mutable.value.copy(adminsBusy=true,adminsError=null)
         viewModelScope.launch {
             try {
-                val ids=repository.admins()
-                if(expected==session.generation) mutable.value=mutable.value.copy(admins=ids,adminsError=null)
+                val found=repository.searchAdmins(query)
+                if(expected==session.generation) mutable.value=mutable.value.copy(admins=found,adminsError=null,adminsBusy=false)
             } catch(error:Exception) {
                 if(error is CancellationException) throw error
-                if(expected==session.generation) mutable.value=mutable.value.copy(adminsError=describe(error))
+                if(expected==session.generation) mutable.value=mutable.value.copy(adminsError=describe(error),adminsBusy=false)
             }
         }
     }
@@ -391,10 +396,17 @@ fun SupportCasesPage(vm:SupportCasesViewModel,authenticated:Boolean,eventsReposi
                             OutlinedButton(onClick={vm.assign(null)},enabled=!state.assignBusy && record.assignedUserId!=null) {Text(stringResource(Res.string.support_unassign))}
                         }
                         if(state.isAdmin) {
-                            val admins=state.admins
-                            if(admins==null) TextButton(onClick=vm::loadAdmins) {Text(stringResource(Res.string.support_assign_other))}
-                            else admins.filter {it!=state.myId}.forEach {adminId ->
-                                TextButton(onClick={vm.assign(adminId)},enabled=!state.assignBusy && record.assignedUserId!=adminId) {Text("${stringResource(Res.string.support_assign_to)} #$adminId")}
+                            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(state.adminQuery,vm::updateAdminQuery,Modifier.weight(1f),singleLine=true,
+                                    label={Text(stringResource(Res.string.support_admin_email))})
+                                TextButton(onClick=vm::searchAdmins,enabled=!state.adminsBusy && state.adminQuery.isNotBlank()) {Text(stringResource(Res.string.support_assign_other))}
+                            }
+                            if(state.adminsBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                            val admins=state.admins?.filter {it.id!=state.myId}
+                            if(admins!=null && admins.isEmpty()) Text(stringResource(Res.string.support_admin_none))
+                            admins?.forEach {admin ->
+                                TextButton(onClick={vm.assign(admin.id)},enabled=!state.assignBusy && record.assignedUserId!=admin.id) {
+                                    Text("${stringResource(Res.string.support_assign_to)} ${admin.email ?: "#${admin.id}"}")}
                             }
                             state.adminsError?.let {Text(it,color=MaterialTheme.colorScheme.error)}
                         }
