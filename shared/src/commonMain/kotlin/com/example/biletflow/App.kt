@@ -508,11 +508,10 @@ fun App(useMockEvents: Boolean = false, sessionStorage: com.example.biletflow.do
                         Text("ID: ${user.id}")
                         Text(stringResource(if(user.emailVerified) Res.string.profile_email_verified else Res.string.profile_email_unverified))
                         if(user.isPlatformAdmin) { Text(stringResource(Res.string.profile_admin)); Button(onClick=adminVm::open) { Text(stringResource(Res.string.admin_title)) } }
-                        when(user.organizer?.status) {
-                            "pending" -> Text(stringResource(Res.string.organizer_pending))
-                            "approved" -> Text(stringResource(Res.string.organizer_approved))
-                            null -> Button(onClick=organizerVm::openForm) { Text(stringResource(Res.string.organizer_apply)) }
-                        }
+                        val org = user.organizer
+                        if (org == null) Button(onClick=organizerVm::openForm) { Text(stringResource(Res.string.organizer_apply)) }
+                        else OrganizerStatus(org.status, org.displayName, org.rejectionReason,
+                            onApplyAgain = organizerVm::openForm, onEditName = { organizerVm.openNameEditor(org.displayName) })
                         TextButton(onClick=currentUserVm::load) { Text(stringResource(Res.string.organizer_refresh)) }
                     }
                     com.example.biletflow.presentation.auth.ChangePasswordSection(changePasswordVm)

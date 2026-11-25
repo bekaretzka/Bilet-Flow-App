@@ -4,7 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class CurrentOrganizer(val id: Int, @SerialName("user_id") val userId: Int, val status: String)
+data class CurrentOrganizer(val id: Int, @SerialName("user_id") val userId: Int, val status: String,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("rejection_reason") val rejectionReason: String? = null)
 @Serializable
 data class CurrentUser(val id: Int, val email: String,
     @SerialName("email_verified") val emailVerified: Boolean,

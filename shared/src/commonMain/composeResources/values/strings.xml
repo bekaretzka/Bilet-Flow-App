@@ -725,4 +725,15 @@
     <string name="verify_email_submit">Confirm</string>
     <string name="verify_email_done">Email confirmed.</string>
     <string name="verify_email_have_link">Enter the link from the email</string>
+    <string name="my_events_summary">Sold: %1$s · Revenue: %2$s ₸</string>
+    <string name="organizer_rejected">Organizer application rejected</string>
+    <string name="organizer_rejection_reason">Reason: %1$s</string>
+    <string name="organizer_apply_again">Apply again</string>
+    <string name="organizer_display_name">Public name</string>
+    <string name="organizer_display_name_hint">Shown to attendees. Leave empty to show the verified legal name.</string>
+    <string name="organizer_display_name_value">Public name: %1$s</string>
+    <string name="organizer_display_name_edit">Change public name</string>
+    <string name="organizer_display_name_save">Save name</string>
+    <string name="organizer_display_name_saved">Public name saved</string>
+    <string name="organizer_display_name_length">The name must have 2 to 100 characters</string>
 </resources>

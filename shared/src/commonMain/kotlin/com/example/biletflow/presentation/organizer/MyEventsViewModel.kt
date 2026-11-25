@@ -24,7 +24,14 @@ data class MyEventsState(val open: Boolean = false, val loading: Boolean = false
     val duplicateOpen: Boolean = false, val duplicateTitle: String = "", val duplicateStart: String = "",
     val duplicating: Boolean = false, val duplicateError: String? = null, val duplicateUnknown: Boolean = false,
     val duplicateStartInvalid: Boolean = false,
-    val coverBusy: Boolean = false, val coverError: String? = null)
+    val coverBusy: Boolean = false, val coverError: String? = null,
+    val summary: Map<Int, EventSummaryRow> = emptyMap())
+
+/** GET /events/me/summary row: the organizer home numbers per event. */
+@kotlinx.serialization.Serializable
+data class EventSummaryRow(@kotlinx.serialization.SerialName("event_id") val eventId: Int, val capacity: Int? = null,
+    @kotlinx.serialization.SerialName("tickets_sold") val ticketsSold: Int = 0, val revenue: Long = 0,
+    @kotlinx.serialization.SerialName("paid_sales_status") val paidSalesStatus: String? = null)
 
 class MyEventsViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
     private val session: SessionStore, private val baseUrl: String = apiBaseUrl) : ViewModel() {
@@ -209,7 +216,9 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
                     }
                 }
                 if (expected == session.generation && requestId == sequence)
-                    { session.user.value?.let { user -> require(events.all(user::owns)) }; mutable.value = mutable.value.copy(loading = false, events = events, statusUnknown = false) }
+                    { session.user.value?.let { user -> require(events.all(user::owns)) }; mutable.value = mutable.value.copy(loading = false, events = events, statusUnknown = false)
+                      val summary = fetchSummary(client, requests, baseUrl)
+                      if (summary != null && expected == session.generation && requestId == sequence) mutable.value = mutable.value.copy(summary = summary) }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 if (expected != session.generation || requestId != sequence) return@launch
@@ -220,3 +229,12 @@ class MyEventsViewModel(private val client: HttpClient, private val requests: Se
         }
     }
 }
+
+/** Numbers for the list come from GET /events/me/summary; failure only hides them (the list itself is /events/me). */
+private suspend fun MyEventsViewModel.fetchSummary(client: HttpClient, requests: SessionOrdersRepository, baseUrl: String): Map<Int, EventSummaryRow>? =
+    try {
+        requests.request { token ->
+            val response = client.get("$baseUrl/events/me/summary") { bearerAuth(token) }
+            if (response.status.value == 200) response.body<List<EventSummaryRow>>().associateBy { it.eventId } else null
+        }
+    } catch (error: Exception) { if (error is CancellationException) throw error; null }

@@ -9,6 +9,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
@@ -19,6 +21,8 @@ data class OrganizerProfile(
     val id: Int,
     @kotlinx.serialization.SerialName("user_id") val userId: Int,
     val status: String,
+    @kotlinx.serialization.SerialName("display_name") val displayName: String? = null,
+    @kotlinx.serialization.SerialName("rejection_reason") val rejectionReason: String? = null,
     @kotlinx.serialization.SerialName("legal_name") val legalName: String? = null,
     @kotlinx.serialization.SerialName("contact_phone") val contactPhone: String? = null,
     @kotlinx.serialization.SerialName("identity_verified_at") val identityVerifiedAt: String? = null,
@@ -34,7 +38,8 @@ data class OrganizerPayoutAccount(
 )
 data class OrganizerState(val loading: Boolean = false, val profile: OrganizerProfile? = null,
     val absent: Boolean = false, val error: Boolean = false, val unauthorized: Boolean = false,
-    val form: Boolean = false)
+    val form: Boolean = false, val editName: Boolean = false, val displayName: String = "",
+    val nameError: String? = null, val nameSaved: Boolean = false)
 
 class OrganizerViewModel(private val client: HttpClient, private val requests: SessionOrdersRepository,
     private val session: SessionStore, private val baseUrl: String = apiBaseUrl, private val onApplied: () -> Unit = {}) : ViewModel() {
@@ -49,10 +54,53 @@ class OrganizerViewModel(private val client: HttpClient, private val requests: S
             mutable.value = OrganizerState()
         }
     } } }
-    fun openForm() { mutable.value = mutable.value.copy(form = true, error = false) }
+    fun openForm() { mutable.value = mutable.value.copy(form = true, editName = false, error = false, displayName = "", nameError = null, nameSaved = false) }
+    /** Edits the public name of an existing profile (PATCH /organizers/me). */
+    fun openNameEditor(current: String?) { mutable.value = mutable.value.copy(form = true, editName = true, error = false, displayName = current.orEmpty(), nameError = null, nameSaved = false) }
+    fun updateName(value: String) { if (!mutable.value.loading) mutable.value = mutable.value.copy(displayName = value, nameError = null, nameSaved = false) }
+    private fun nameValid(name: String) = name.isEmpty() || name.length in 2..100
     fun closeForm() { if (!mutable.value.loading) mutable.value = mutable.value.copy(form = false) }
     fun load() = run(false)
-    fun apply() { if (!mutable.value.loading) run(true) }
+    fun apply() {
+        if (mutable.value.loading) return
+        if (!nameValid(mutable.value.displayName.trim())) { mutable.value = mutable.value.copy(nameError = "length"); return }
+        run(true)
+    }
+    /** PATCH /organizers/me {display_name: 2-100 | null}; an empty field clears the name (event pages then show the legal name). */
+    fun saveName() {
+        val s = mutable.value
+        val name = s.displayName.trim()
+        if (s.loading || session.tokens.value == null) return
+        if (!nameValid(name)) { mutable.value = s.copy(nameError = "length"); return }
+        val expected = session.generation; val requestId = ++sequence
+        mutable.value = s.copy(loading = true, nameError = null, nameSaved = false)
+        viewModelScope.launch {
+            try {
+                val profile = requests.request { token ->
+                    val response = client.patch("$baseUrl/organizers/me") {
+                        bearerAuth(token); contentType(ContentType.Application.Json)
+                        setBody(buildJsonObject { if (name.isEmpty()) put("display_name", JsonNull) else put("display_name", name) })
+                    }
+                    if (response.status.value == 200) response.body<OrganizerProfile>() else {
+                        val payload = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()
+                        throw OrdersApiException(response.status.value, payload?.get("error")?.jsonPrimitive?.contentOrNull, "Organizer request failed")
+                    }
+                }
+                if (expected != session.generation || requestId != sequence) return@launch
+                mutable.value = mutable.value.copy(loading = false, profile = profile, displayName = profile.displayName.orEmpty(), nameSaved = true)
+                onApplied()
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                if (expected != session.generation || requestId != sequence) return@launch
+                val api = error as? OrdersApiException
+                mutable.value = mutable.value.copy(loading = false, nameError = when {
+                    api?.statusCode == 422 -> "length"
+                    api == null || api.statusCode >= 500 -> "unknown"
+                    else -> "HTTP ${api.statusCode}: ${api.errorCode ?: ""}"
+                })
+            }
+        }
+    }
     private fun run(apply: Boolean) {
         if (session.tokens.value == null || mutable.value.loading) return
         val expected = session.generation
@@ -61,7 +109,11 @@ class OrganizerViewModel(private val client: HttpClient, private val requests: S
         viewModelScope.launch {
             try {
                 val profile = requests.request { token ->
-                    val response = if (apply) client.post("$baseUrl/organizers/apply") { bearerAuth(token) }
+                    val applyName = mutable.value.displayName.trim()
+                    val response = if (apply) client.post("$baseUrl/organizers/apply") {
+                            bearerAuth(token)
+                            if (applyName.isNotEmpty()) { contentType(ContentType.Application.Json); setBody(buildJsonObject { put("display_name", applyName) }) }
+                        }
                         else client.get("$baseUrl/organizers/me") { bearerAuth(token) }
                     if (response.status.value == 200) response.body<OrganizerProfile>() else {
                         val payload = runCatching { Json.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrNull()

@@ -725,4 +725,15 @@
     <string name="verify_email_submit">Подтвердить</string>
     <string name="verify_email_done">Email подтверждён.</string>
     <string name="verify_email_have_link">Ввести ссылку из письма</string>
+    <string name="my_events_summary">Продано: %1$s · Выручка: %2$s ₸</string>
+    <string name="organizer_rejected">Заявка организатора отклонена</string>
+    <string name="organizer_rejection_reason">Причина: %1$s</string>
+    <string name="organizer_apply_again">Подать заявку снова</string>
+    <string name="organizer_display_name">Публичное имя</string>
+    <string name="organizer_display_name_hint">Его видят посетители. Пустое поле — показывается подтверждённое юридическое имя.</string>
+    <string name="organizer_display_name_value">Публичное имя: %1$s</string>
+    <string name="organizer_display_name_edit">Изменить публичное имя</string>
+    <string name="organizer_display_name_save">Сохранить имя</string>
+    <string name="organizer_display_name_saved">Публичное имя сохранено</string>
+    <string name="organizer_display_name_length">Имя должно быть от 2 до 100 символов</string>
 </resources>

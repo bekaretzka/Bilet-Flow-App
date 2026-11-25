@@ -43,6 +43,11 @@ fun MyEventsPage(vm: MyEventsViewModel, onCreate: () -> Unit = {}, onPlatformSup
                             Text(event.title, style = MaterialTheme.typography.titleLarge)
                             Text(formatEventDate(event.startTime))
                             event.venueName?.takeIf { it.isNotBlank() }?.let { Text(it) }
+                            state.summary[event.id]?.let { s ->
+                                val sold = s.capacity?.let { "${s.ticketsSold} / $it" } ?: s.ticketsSold.toString()
+                                Text(stringResource(Res.string.my_events_summary, sold,
+                                    s.revenue.toString().reversed().chunked(3).joinToString(" ").reversed()))
+                            }
                             Text(stringResource(when(event.status) {
                                 "draft" -> Res.string.my_events_drafts
                                 "published" -> Res.string.my_events_published
